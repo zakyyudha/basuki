@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basuki - API Redirector</title>
+    <link rel="stylesheet" href="./styles/popup.css">
+</head>
+<body>
+
+<div class="tabs">
+    <div id="tab-form" class="active">Tambah Konfigurasi</div>
+    <div id="tab-configs">Konfigurasi</div>
+</div>
+
+<!-- Tab Content for the Form -->
+<div id="formContent" class="tab-content active">
+    <h3>Basuki - API Redirector</h3>
+    <div class="form-group">
+        <label for="configName">Nama Konfigurasi:</label>
+        <input type="text" id="configName" placeholder="Masukkan nama konfigurasi">
+    </div>
+    <div class="form-group">
+        <label for="urlContains">Pranala Mengandung:</label>
+        <input type="text" id="urlContains" placeholder="Masukkan potongan dari pranala">
+    </div>
+    <div class="form-group">
+        <label for="replaceText">Ubah:</label>
+        <input type="text" id="replaceText" placeholder="Teks yang ingin diubah">
+    </div>
+    <div class="form-group">
+        <label for="withText">Dengan:</label>
+        <input type="text" id="withText" placeholder="Teks pengganti">
+    </div>
+    <button id="save">Simpan</button>
+</div>
+
+<!-- Tab Content for the Configuration List -->
+<div id="configsContent" class="tab-content">
+    <h3>Konfigurasi</h3>
+    <table id="configTable">
+        <thead>
+        <tr>
+            <th>Nama Konfigurasi</th>
+            <th>Aktifkan</th>
+            <th>Debug</th>
+            <th>Aksi</th>
+        </tr>
+        </thead>
+        <tbody id="configList"></tbody>
+    </table>
+</div>
+
+<footer>
+    <p style="font-size: 12px; text-align: center; margin-top: 20px;">&copy; 2024 v1.0.0 <a
+            href="https://github.com/zakyyudha/basuki" target="_blank">GitHub</a></p>
+</footer>
+
+<!-- Reference the external JavaScript file -->
+<script src="./scripts/popup.js"></script>
+</body>
+</html>
