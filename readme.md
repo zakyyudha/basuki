@@ -1,6 +1,6 @@
-# Basuki API Redirector
+# Basuki
 
-**Basuki API Redirector** is a Chrome extension designed to help developers intercept and modify API requests in real time. This tool allows you to dynamically replace parts of URLs in API requests, making it ideal for debugging and local development environments where you want to redirect live API calls to a local server.
+**Basuki** is a Chrome extension designed to help developers intercept and modify API requests in real time. This tool allows you to dynamically replace parts of URLs in API requests, making it ideal for debugging and local development environments where you want to redirect live API calls to a local server.
 
 ## Features
 - Intercepts and modifies API requests (both `XMLHttpRequest` and `fetch`).

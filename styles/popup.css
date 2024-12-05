@@ -1,110 +1,44 @@
-/* Basic styling for body */
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 10px;
-    background-color: #f5f5f5;
-    width: 400px;
-    box-sizing: border-box;
+html {
+    width: 600px;
 }
 
-h3 {
-    margin: 0 0 15px;
-    color: #333;
-    font-size: 18px;
-    text-align: center;
+.bi {
+    vertical-align: -.125em;
+    fill: currentColor;
 }
 
-.tabs {
+.nav-scroller .nav {
     display: flex;
-    justify-content: space-around;
-    cursor: pointer;
-}
-
-.tabs div {
-    padding: 10px 20px;
-    background-color: #e0e0e0;
-    border: 1px solid #ccc;
-}
-
-.tabs div.active {
-    background-color: #fff;
-    border-bottom: none;
-}
-
-.tab-content {
-    display: none;
-    padding: 20px;
-    background-color: #fff;
-    border: 1px solid #ccc;
-}
-
-.tab-content.active {
-    display: block;
-}
-
-.form-group {
-    margin-bottom: 15px;
-}
-
-label {
-    display: block;
-    margin-bottom: 5px;
-    color: #555;
-    font-weight: bold;
-}
-
-input[type="text"] {
-    width: 100%;
-    padding: 8px;
-    box-sizing: border-box;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-button {
-    width: 100%;
-    padding: 10px;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 16px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-}
-
-button:hover {
-    background-color: #0056b3;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-}
-
-table th, table td {
-    border: 1px solid #ddd;
-    padding: 8px;
+    flex-wrap: nowrap;
+    padding-bottom: 1rem;
+    margin-top: -1px;
+    overflow-x: auto;
     text-align: center;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
 }
 
-table th {
-    background-color: #f2f2f2;
-    font-weight: bold;
+.btn-bd-primary {
+    --bd-violet-bg: #712cf9;
+    --bd-violet-rgb: 112.520718, 44.062154, 249.437846;
+
+    --bs-btn-font-weight: 600;
+    --bs-btn-color: var(--bs-white);
+    --bs-btn-bg: var(--bd-violet-bg);
+    --bs-btn-border-color: var(--bd-violet-bg);
+    --bs-btn-hover-color: var(--bs-white);
+    --bs-btn-hover-bg: #6528e0;
+    --bs-btn-hover-border-color: #6528e0;
+    --bs-btn-focus-shadow-rgb: var(--bd-violet-rgb);
+    --bs-btn-active-color: var(--bs-btn-hover-color);
+    --bs-btn-active-bg: #5a23c8;
+    --bs-btn-active-border-color: #5a23c8;
 }
 
-.btn-delete {
-    background-color: #dc3545;
-    padding: 1.25px 2.5px;
-    color: white;
-    border: none;
-    cursor: pointer;
-    border-radius: 4px;
+.bd-mode-toggle {
+    z-index: 1500;
 }
 
-.btn-delete:hover {
-    background-color: #c82333;
+.bd-mode-toggle .dropdown-menu .active .bi {
+    display: block !important;
 }

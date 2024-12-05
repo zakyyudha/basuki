@@ -4,23 +4,23 @@ function injectScript (src, config) {
   s.type = 'module'
   s.onload = () => {
     s.remove()
-    window.postMessage({ type: 'API_REDIRECTOR_CONFIG', config }, '*')
+    window.postMessage({ type: 'BASUKI_CONFIG', config }, '*')
   };
   (document.head || document.documentElement).append(s)
 }
 
-chrome.storage.sync.get('configs', (data) => {
-  const configs = data.configs || []
-  console.log('Basuki - API Redirector Settings Loaded:', configs)
+chrome.storage.local.get((data) => {
+  const anyEnabled = data.apiRedirect.configs.some(
+      config => config.enabled) ||
+    data.apiIntercept.configs.some(config => config.enabled)
 
-  const isAnyConfigEnabled = configs.some(config => config.enabled)
+  console.log('Basuki - Settings Loaded:', data)
 
-  if (!isAnyConfigEnabled) {
-    console.log('Basuki - API Redirector is disabled.')
+  if (!anyEnabled) {
+    console.log('Basuki - Disabled because no configs are enabled.')
     return
   }
 
-  console.log('Basuki - API Redirector is enabled.')
-
-  injectScript('scripts/basuki.intercept.js', configs)
+  console.log('Basuki - Injecting content script.')
+  injectScript('scripts/basuki.intercept.js', data)
 })

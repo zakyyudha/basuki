@@ -1,70 +1,119 @@
 window.addEventListener('message', (event) => {
-  if (event.source !== window || event.data.type !== 'API_REDIRECTOR_CONFIG') {
+  if (event.source !== window || event.data.type !== 'BASUKI_CONFIG') {
     return
   }
 
-  const configs = event.data.config
-
-  const consoleLog = (message) => {
-    configs.forEach(config => {
-      if (config.enabled && config.debug) {
-        console.log(message, config)
-      }
-    })
+  const ConfigType = {
+    API_REDIRECT: 'apiRedirect',
+    API_INTERCEPT: 'apiIntercept',
   }
+
+  const configs = event.data.config
+  const apiRedirectConfigs = configs[ConfigType.API_REDIRECT]?.configs || []
+  const apiInterceptConfigs = configs[ConfigType.API_INTERCEPT]?.configs || []
+
+  const logToConsole = (...messages) => console.log(...messages)
 
   // Log all received configs
-  consoleLog('Configs received in injected script:', configs)
+  logToConsole('Received configs in injected script:', configs)
 
-  // Function to check if a URL matches any of the configs
-  const getMatchingConfig = (url) => {
-    return configs.find(
-      config => url && config.enabled && url.includes(config.urlContains))
-  }
+  // Helper functions to find matching configurations
+  const findMatchingRedirectConfig = (url) =>
+    apiRedirectConfigs.find(
+      config => url && config.enabled &&
+        (url || '').includes(config.urlContains))
+
+  const findMatchingInterceptConfig = (url, method) =>
+    apiInterceptConfigs.find((config) =>
+      url && config.enabled &&
+      url.includes(config.interceptUrlContains) &&
+      config.interceptRequestMethod === (method || '').toUpperCase())
 
   // Override XMLHttpRequest
-  const originalXMLHttpRequest = XMLHttpRequest.prototype.open
-  XMLHttpRequest.prototype.open = function (
-    method, url, async, user, password) {
-    consoleLog(`Intercepted XMLHttpRequest to URL: ${url}`)
+  const originalXMLHttpRequestOpen = XMLHttpRequest.prototype.open
+  XMLHttpRequest.prototype.open = function (method, url, ...args) {
+    const redirectConfig = findMatchingRedirectConfig(url)
+    const interceptConfig = findMatchingInterceptConfig(url, method)
 
-    const matchingConfig = getMatchingConfig(url)
-    if (matchingConfig) {
+    if (redirectConfig) {
       const originalUrl = url
-      url = url.replace(matchingConfig.replaceText, matchingConfig.withText)
-      consoleLog(
-        `Modified URL from ${originalUrl} to ${url} for config: ${matchingConfig.name}`)
-    } else {
-      consoleLog('No modification needed for this URL.')
+      url = url.replace(redirectConfig.replaceText, redirectConfig.withText)
+      if (redirectConfig.debug) {
+        logToConsole(
+          `Redirected URL from ${originalUrl} to ${url} for config: ${redirectConfig.configName}`)
+      }
     }
 
-    arguments[1] = url
-    return originalXMLHttpRequest.apply(this, arguments)
+    args[0] = url // Modify the request URL
+
+    // Setup response interception
+    this.addEventListener('readystatechange', function () {
+      if (this.readyState === 4 && interceptConfig) {
+        logToConsole('Intercepting response for:', url)
+        const {
+          interceptHttpStatusCode,
+          interceptResponseBody,
+          debug,
+        } = interceptConfig
+        const responseOverride = {
+          status: Number(interceptHttpStatusCode),
+          responseText: JSON.parse(interceptResponseBody),
+        }
+
+        if (debug) {
+          logToConsole('Modified response:', responseOverride.responseText)
+          logToConsole('New status:', responseOverride.status)
+        }
+
+        Object.defineProperties(this, {
+          responseText: { value: responseOverride.responseText },
+          status: { value: responseOverride.status },
+        })
+
+      }
+    })
+
+    return originalXMLHttpRequestOpen.apply(this, [method, url, ...args])
   }
 
   // Override fetch
   const originalFetch = window.fetch
-  window.fetch = function (input, init) {
+  window.fetch = async function (input, init) {
     let url = typeof input === 'string' ? input : input.url
-    consoleLog(`Intercepted fetch request to URL: ${url}`)
+    const method = init?.method
 
-    const matchingConfig = getMatchingConfig(url)
-    if (matchingConfig) {
+    const redirectConfig = findMatchingRedirectConfig(url)
+    const interceptConfig = findMatchingInterceptConfig(url, method)
+
+    if (redirectConfig) {
       const originalUrl = url
-      url = url.replace(matchingConfig.replaceText, matchingConfig.withText)
-      consoleLog(
-        `Modified URL from ${originalUrl} to ${url} for config: ${matchingConfig.name}`)
-
-      if (typeof input === 'string') {
-        input = url
-      } else {
-        input = { ...input, url }
+      url = url.replace(redirectConfig.replaceText, redirectConfig.withText)
+      if (redirectConfig.debug) {
+        logToConsole(
+          `Redirected URL from ${originalUrl} to ${url} for config: ${redirectConfig.configName}`)
       }
-    } else {
-      consoleLog('No modification needed for this URL.')
+
+      input = typeof input === 'string' ? url : { ...input, url }
     }
 
-    return originalFetch.call(this, input, init)
-  }
+    const response = await originalFetch.call(this, input, init)
 
+    if (interceptConfig) {
+      const clonedResponse = response.clone()
+      const modifiedResponseText = interceptConfig.interceptResponseBody
+      const { httpStatusCode, debug } = interceptConfig
+
+      if (debug) {
+        logToConsole('Modified HTTP status:', httpStatusCode)
+        logToConsole('Modified response:', modifiedResponseText)
+      }
+
+      return new Response(modifiedResponseText, {
+        status: httpStatusCode,
+        headers: clonedResponse.headers,
+      })
+    }
+
+    return response
+  }
 })
