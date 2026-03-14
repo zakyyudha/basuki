@@ -25,9 +25,11 @@ export const VALUE_IDS = {
 
 // Helper class for managing configuration operations
 export class ConfigManager {
-  constructor (kind, valueIds) {
+  constructor (kind, valueIds, options = {}) {
     this.kind = kind
     this.valueIds = valueIds
+    this.feedback = options.feedback
+    this.onStateChanged = options.onStateChanged
   }
 
   static async getConfigs (kind) {
@@ -74,7 +76,7 @@ export class ConfigManager {
         console.log('Basuki - Validation result:', { isValid, message })
 
         if (!isValid) {
-          alert(message)
+          this.feedback?.show(message, 'error')
           return
         }
 
@@ -90,7 +92,7 @@ export class ConfigManager {
         console.log('Basuki - Save completed successfully')
       } catch (error) {
         console.error('Basuki - Save error:', error)
-        alert(copyFrom('feedback.saveErrorPrefix') + error.message)
+        this.feedback?.show(copyFrom('feedback.saveErrorPrefix') + error.message, 'error', 4000)
       }
     })
   }
@@ -111,8 +113,9 @@ export class ConfigManager {
       await ConfigManager.saveConfigs(this.kind, configs)
       console.log('Basuki - Configs saved to storage')
 
-      alert(copyFrom('feedback.configSaved'))
-      this.loadConfigs() // Reload configurations
+      this.feedback?.show(copyFrom('feedback.configSaved'), 'success')
+      await this.loadConfigs()
+      this.onStateChanged?.()
     } catch (error) {
       console.error('Basuki - createNewConfig error:', error)
       throw error
@@ -122,7 +125,7 @@ export class ConfigManager {
   async updateExistingConfig (id, values) {
     // Update the specific config using its ID
     await this.updateConfig(this.kind, id, values)
-    alert(copyFrom('feedback.configUpdated'))
+    this.feedback?.show(copyFrom('feedback.configUpdated'), 'success')
   }
 
   async loadConfigs () {
@@ -241,13 +244,16 @@ export class ConfigManager {
       config.id === Number(id) ? { ...config, ...updates } : config,
     )
     await ConfigManager.saveConfigs(kind, updatedConfigs)
-    this.loadConfigs()
+    await this.loadConfigs()
+    this.onStateChanged?.()
   }
 
   async deleteConfig (id) {
     const configs = await ConfigManager.getConfigs(this.kind)
     const updatedConfigs = configs.filter(config => config.id !== id)
     await ConfigManager.saveConfigs(this.kind, updatedConfigs)
-    this.loadConfigs()
+    await this.loadConfigs()
+    this.onStateChanged?.()
+    this.feedback?.show(copyFrom('feedback.configDeleted'), 'info')
   }
 }

@@ -2,7 +2,9 @@ import { getStorageData } from '../../background/utils/storage.js'
 import { copyFrom } from '../utils/copy.js'
 
 export class SessionIsolationManager {
-  constructor() {
+  constructor(options = {}) {
+    this.feedback = options.feedback
+    this.onStateChanged = options.onStateChanged
     this.initEventListeners()
     this.loadIsolatedTabs()
     this.initUpdateListener()
@@ -15,7 +17,7 @@ export class SessionIsolationManager {
       const url = urlInput.value.trim()
       
       if (!url) {
-        alert(copyFrom('sessions.enterValidUrl'))
+        this.feedback?.show(copyFrom('sessions.enterValidUrl'), 'error')
         return
       }
       
@@ -23,7 +25,7 @@ export class SessionIsolationManager {
       try {
         new URL(url)
       } catch (e) {
-        alert(copyFrom('sessions.invalidUrlFormat'))
+        this.feedback?.show(copyFrom('sessions.invalidUrlFormat'), 'error')
         return
       }
       
@@ -32,8 +34,14 @@ export class SessionIsolationManager {
         (response) => {
           if (response.success) {
             urlInput.value = ''
+            this.feedback?.show(copyFrom('sessions.created'), 'success')
             // Reload after a short delay to allow the tab to be created
-            setTimeout(() => this.loadIsolatedTabs(), 500)
+            setTimeout(async () => {
+              await this.loadIsolatedTabs()
+              this.onStateChanged?.()
+            }, 500)
+          } else {
+            this.feedback?.show(copyFrom('sessions.createFailed'), 'error')
           }
         }
       )
@@ -47,7 +55,11 @@ export class SessionIsolationManager {
           { action: 'clearAllIsolatedSessions' },
           (response) => {
             if (response.success) {
+              this.feedback?.show(copyFrom('sessions.cleared'), 'info')
               this.loadIsolatedTabs() // Refresh the list
+              this.onStateChanged?.()
+            } else {
+              this.feedback?.show(copyFrom('sessions.clearFailed'), 'error')
             }
           }
         )
@@ -60,7 +72,7 @@ export class SessionIsolationManager {
       const newName = document.getElementById('sessionName').value.trim()
       
       if (!newName) {
-        alert(copyFrom('sessions.emptyName'))
+        this.feedback?.show(copyFrom('sessions.emptyName'), 'error')
         return
       }
       
@@ -72,6 +84,10 @@ export class SessionIsolationManager {
             const modal = bootstrap.Modal.getInstance(document.getElementById('renameSessionModal'))
             modal.hide()
             this.loadIsolatedTabs()
+            this.onStateChanged?.()
+            this.feedback?.show(copyFrom('sessions.renamed'), 'success')
+          } else {
+            this.feedback?.show(copyFrom('sessions.renameFailed'), 'error')
           }
         }
       )
@@ -194,7 +210,7 @@ export class SessionIsolationManager {
         if (response.success) {
           window.close() // Close the popup as the tab is now active
         } else {
-          alert(copyFrom('sessions.activateFailed'))
+          this.feedback?.show(copyFrom('sessions.activateFailed'), 'error')
           this.loadIsolatedTabs() // Refresh the list
         }
       }
@@ -215,6 +231,10 @@ export class SessionIsolationManager {
         (response) => {
           if (response.success) {
             this.loadIsolatedTabs()
+            this.onStateChanged?.()
+            this.feedback?.show(copyFrom('sessions.deleted'), 'info')
+          } else {
+            this.feedback?.show(copyFrom('sessions.deleteFailed'), 'error')
           }
         }
       )

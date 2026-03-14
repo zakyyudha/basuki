@@ -30,6 +30,7 @@ export const POPUP_COPY = {
   feedback: {
     configSaved: 'Konfigurasi disimpan (Configuration saved)',
     configUpdated: 'Konfigurasi berhasil diperbarui (Configuration updated)',
+    configDeleted: 'Konfigurasi dihapus (Configuration deleted)',
     saveErrorPrefix: 'Gagal menyimpan konfigurasi (Failed to save configuration): ',
   },
   validation: {
@@ -45,6 +46,14 @@ export const POPUP_COPY = {
     enterValidUrl: 'Silakan masukkan URL yang valid (Please enter a valid URL)',
     invalidUrlFormat: 'URL tidak valid. Gunakan format yang benar, contoh: https://example.com (Invalid URL format)',
     emptyName: 'Nama sesi tidak boleh kosong (Session name cannot be empty)',
+    created: 'Tab terisolasi dibuat (Isolated tab created)',
+    createFailed: 'Gagal membuat tab terisolasi (Failed to create isolated tab)',
+    renamed: 'Nama sesi diperbarui (Session name updated)',
+    renameFailed: 'Gagal mengubah nama sesi (Failed to rename session)',
+    deleted: 'Tab terisolasi dihapus (Isolated tab deleted)',
+    deleteFailed: 'Gagal menghapus tab terisolasi (Failed to delete isolated tab)',
+    cleared: 'Semua sesi terisolasi dihapus (All isolated sessions cleared)',
+    clearFailed: 'Gagal menghapus semua sesi (Failed to clear all sessions)',
     activateFailed: 'Gagal mengaktifkan tab (Failed to activate tab)',
     emptyState: 'Tidak ada tab terisolasi aktif saat ini. (No active isolated tabs right now.)',
   },
