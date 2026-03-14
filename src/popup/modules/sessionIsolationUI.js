@@ -1,4 +1,5 @@
 import { getStorageData } from '../../background/utils/storage.js'
+import { copyFrom } from '../utils/copy.js'
 
 export class SessionIsolationManager {
   constructor() {
@@ -14,7 +15,7 @@ export class SessionIsolationManager {
       const url = urlInput.value.trim()
       
       if (!url) {
-        alert('Silakan masukkan URL valid')
+        alert(copyFrom('sessions.enterValidUrl'))
         return
       }
       
@@ -22,7 +23,7 @@ export class SessionIsolationManager {
       try {
         new URL(url)
       } catch (e) {
-        alert('URL tidak valid. Pastikan formatnya benar (contoh: https://example.com)')
+        alert(copyFrom('sessions.invalidUrlFormat'))
         return
       }
       
@@ -40,7 +41,7 @@ export class SessionIsolationManager {
     
     // Clear all session isolation
     document.getElementById('isolation-clearSessionIsolation').addEventListener('click', () => {
-      if (confirm('Apakah anda yakin ingin menghapus semua sesi terisolasi? Tab yang terisolasi akan ditutup.')) {
+      if (confirm(copyFrom('confirmations.clearSessions'))) {
         // Send message to background script to handle closing tabs and clearing storage
         chrome.runtime.sendMessage(
           { action: 'clearAllIsolatedSessions' },
@@ -59,7 +60,7 @@ export class SessionIsolationManager {
       const newName = document.getElementById('sessionName').value.trim()
       
       if (!newName) {
-        alert('Nama sesi tidak boleh kosong')
+        alert(copyFrom('sessions.emptyName'))
         return
       }
       
@@ -96,6 +97,7 @@ export class SessionIsolationManager {
       tableBody.innerHTML = ''
       
       if (isolatedTabs.length === 0) {
+        noTabsMessage.textContent = copyFrom('sessions.emptyState')
         noTabsMessage.style.display = 'block'
         table.style.display = 'none'
         return
@@ -131,7 +133,9 @@ export class SessionIsolationManager {
         statusBadge.className = tab.active
           ? 'status-badge status-badge--active'
           : 'status-badge status-badge--inactive'
-        statusBadge.textContent = tab.active ? 'Aktif' : 'Tidak Aktif'
+        statusBadge.textContent = tab.active
+          ? copyFrom('status.active')
+          : copyFrom('status.inactive')
         statusCell.appendChild(statusBadge)
         row.appendChild(statusCell)
         
@@ -144,7 +148,7 @@ export class SessionIsolationManager {
         if (tab.active) {
           const goToTabBtn = document.createElement('button')
           goToTabBtn.className = 'btn btn-sm action-btn action-btn--success'
-          goToTabBtn.textContent = 'Buka Tab'
+          goToTabBtn.textContent = copyFrom('actions.openTab')
           goToTabBtn.addEventListener('click', () => {
             chrome.tabs.update(tab.tabId, { active: true }, () => {
               window.close() // Close the popup after navigating
@@ -157,7 +161,7 @@ export class SessionIsolationManager {
         if (!tab.active) {
           const activateBtn = document.createElement('button')
           activateBtn.className = 'btn btn-sm action-btn action-btn--primary'
-          activateBtn.textContent = 'Aktifkan'
+          activateBtn.textContent = copyFrom('actions.activate')
           activateBtn.addEventListener('click', () => this.activateIsolatedTab(tab.id))
           actionsWrapper.appendChild(activateBtn)
         }
@@ -165,14 +169,14 @@ export class SessionIsolationManager {
         // Rename button
         const renameBtn = document.createElement('button')
         renameBtn.className = 'btn btn-sm action-btn action-btn--neutral'
-        renameBtn.textContent = 'Ubah Nama'
+        renameBtn.textContent = copyFrom('actions.rename')
         renameBtn.addEventListener('click', () => this.showRenameModal(tab))
         actionsWrapper.appendChild(renameBtn)
         
         // Delete button
         const deleteBtn = document.createElement('button')
         deleteBtn.className = 'btn btn-sm action-btn action-btn--danger'
-        deleteBtn.textContent = 'Hapus'
+        deleteBtn.textContent = copyFrom('actions.delete')
         deleteBtn.addEventListener('click', () => this.removeIsolatedTab(tab.id))
         actionsWrapper.appendChild(deleteBtn)
         
@@ -190,7 +194,7 @@ export class SessionIsolationManager {
         if (response.success) {
           window.close() // Close the popup as the tab is now active
         } else {
-          alert('Gagal mengaktifkan tab')
+          alert(copyFrom('sessions.activateFailed'))
           this.loadIsolatedTabs() // Refresh the list
         }
       }
@@ -205,7 +209,7 @@ export class SessionIsolationManager {
   }
   
   removeIsolatedTab(isolationId) {
-    if (confirm('Apakah anda yakin ingin menghapus tab terisolasi ini?')) {
+    if (confirm(copyFrom('confirmations.deleteSession'))) {
       chrome.runtime.sendMessage(
         { action: 'removeIsolatedTab', isolationId },
         (response) => {

@@ -87,15 +87,15 @@
     <nav class="popup-shell__nav nav nav-pills" id="workflowNav" role="tablist" aria-label="Top level workflows">
         <button class="nav-link active" id="workflow-redirects-tab" type="button" role="tab"
                 data-workflow-target="apiRedirector" aria-controls="apiRedirector" aria-selected="true">
-            Redirects
+            <span data-copy="nav.redirects">Pengalihan API (Redirects)</span>
         </button>
         <button class="nav-link" id="workflow-intercepts-tab" type="button" role="tab"
                 data-workflow-target="interceptRequest" aria-controls="interceptRequest" aria-selected="false">
-            Intercepts
+            <span data-copy="nav.intercepts">Pemintas API (Intercepts)</span>
         </button>
         <button class="nav-link" id="workflow-sessions-tab" type="button" role="tab"
                 data-workflow-target="sessionIsolation" aria-controls="sessionIsolation" aria-selected="false">
-            Sessions
+            <span data-copy="nav.sessions">Isolasi Sesi (Sessions)</span>
         </button>
     </nav>
 
@@ -116,15 +116,15 @@
                 <div class="tab-pane container active workflow-form" id="createConfiguration">
                     <input type="hidden" id="id">
                     <div class="workflow-field mt-2">
-                        <label for="configName" class="form-label">Nama Konfigurasi:</label>
-                        <input type="text" class="form-control" id="configName" placeholder="Masukkan nama konfigurasi">
+                        <label for="configName" class="form-label" data-copy="labels.configName">Nama Konfigurasi (Configuration Name)</label>
+                        <input type="text" class="form-control" id="configName" data-copy-placeholder="labels.configName" placeholder="Nama Konfigurasi (Configuration Name)">
                     </div>
                     <div class="workflow-field">
-                        <label for="urlContains" class="form-label">Jika Pranala Berisikan:</label>
+                        <label for="urlContains" class="form-label" data-copy="labels.conditions">Kondisi (Condition)</label>
                         <input type="text" class="form-control" id="urlContains" placeholder="Masukkan potongan dari pranala">
                     </div>
                     <div class="workflow-field">
-                        <label for="replaceText" class="form-label">Maka Ubah:</label>
+                        <label for="replaceText" class="form-label" data-copy="labels.replacement">Penggantian (Replacement)</label>
                         <input type="text" class="form-control" id="replaceText" placeholder="Masukkan teks yang ingin diubah">
                     </div>
                     <div class="workflow-field">
@@ -132,7 +132,7 @@
                         <input type="text" class="form-control" id="withText" placeholder="Masukkan teks pengganti">
                     </div>
                     <div class="d-grid">
-                        <button id="save" class="btn action-btn action-btn--primary btn-block">Simpan</button>
+                        <button id="save" class="btn action-btn action-btn--primary btn-block" data-copy="actions.save">Simpan (Save)</button>
                     </div>
                 </div>
                 <div class="tab-pane container fade" id="configurations">
@@ -166,11 +166,11 @@
                 <div class="tab-pane container active workflow-form" id="intercept-createConfiguration">
                     <input type="hidden" id="interceptId">
                     <div class="workflow-field mt-2">
-                        <label for="interceptConfigName" class="form-label">Nama Konfigurasi:</label>
-                        <input type="text" class="form-control" id="interceptConfigName" placeholder="Masukkan nama konfigurasi">
+                        <label for="interceptConfigName" class="form-label" data-copy="labels.configName">Nama Konfigurasi (Configuration Name)</label>
+                        <input type="text" class="form-control" id="interceptConfigName" data-copy-placeholder="labels.configName" placeholder="Nama Konfigurasi (Configuration Name)">
                     </div>
                     <div class="workflow-field">
-                        <label for="interceptUrlContains" class="form-label">Jika Pranala Berisikan:</label>
+                        <label for="interceptUrlContains" class="form-label" data-copy="labels.conditions">Kondisi (Condition)</label>
                         <input type="text" class="form-control" id="interceptUrlContains" placeholder="Masukkan potongan dari pranala">
                     </div>
                     <div class="workflow-field">
@@ -178,7 +178,7 @@
                         <input type="number" min="100" max="599" value="200" class="form-control" id="interceptHttpStatusCode" placeholder="Masukkan Kode Status HTTP">
                     </div>
                     <div class="workflow-field">
-                        <label for="interceptRequestMethod" class="form-label">Metode <i>Request</i>:</label>
+                        <label for="interceptRequestMethod" class="form-label" data-copy="labels.method">Metode Request (Request Method)</label>
                         <select class="form-select" id="interceptRequestMethod">
                             <option value="GET">GET</option>
                             <option value="POST">POST</option>
@@ -190,11 +190,11 @@
                         </select>
                     </div>
                     <div class="workflow-field">
-                        <label for="interceptResponseBody" class="form-label">Respon <i>Body</i>:</label>
+                        <label for="interceptResponseBody" class="form-label" data-copy="labels.responseBody">Body Respons (Response Body)</label>
                         <textarea class="form-control" id="interceptResponseBody" rows="10" placeholder="Masukkan Respon API"></textarea>
                     </div>
                     <div class="d-grid">
-                        <button id="intercept-save" class="btn action-btn action-btn--primary btn-block">Simpan</button>
+                        <button id="intercept-save" class="btn action-btn action-btn--primary btn-block" data-copy="actions.save">Simpan (Save)</button>
                     </div>
                 </div>
                 <div class="tab-pane container fade" id="intercept-configurations">
@@ -219,7 +219,7 @@
                 <label for="newIsolationUrl" class="form-label">URL Tab Baru:</label>
                 <div class="input-group">
                     <input type="text" class="form-control" id="newIsolationUrl" placeholder="Masukkan URL untuk membuat tab terisolasi baru">
-                    <button class="btn action-btn action-btn--success" id="createIsolatedTab">Buat Tab</button>
+                    <button class="btn action-btn action-btn--success" id="createIsolatedTab" data-copy="actions.createTab">Buat Tab (Create Tab)</button>
                 </div>
             </div>
 
@@ -238,32 +238,32 @@
                         <tbody id="isolatedTabsList"></tbody>
                     </table>
                 </div>
-                <div id="noIsolatedTabs" class="alert text-center empty-state">
-                    Tidak ada tab terisolasi aktif saat ini.
+                <div id="noIsolatedTabs" class="alert text-center empty-state" data-copy="sessions.emptyState">
+                    Tidak ada tab terisolasi aktif saat ini. (No active isolated tabs right now.)
                 </div>
             </div>
 
             <div class="d-grid gap-2">
-                <a href="#" class="btn action-btn action-btn--danger" id="isolation-clearSessionIsolation">Hapus Semua Sesi</a>
+                <a href="#" class="btn action-btn action-btn--danger" id="isolation-clearSessionIsolation" data-copy="actions.clearAll">Hapus Semua Sesi (Clear All Sessions)</a>
             </div>
 
             <div class="modal fade" id="renameSessionModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">Ubah Nama Sesi</h5>
+                            <h5 class="modal-title" data-copy="actions.rename">Ubah Nama (Rename)</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
                             <input type="hidden" id="renameSessionId">
                             <div class="mb-3">
-                                <label for="sessionName" class="form-label">Nama Sesi:</label>
+                                <label for="sessionName" class="form-label" data-copy="labels.sessionName">Nama Sesi (Session Name)</label>
                                 <input type="text" class="form-control" id="sessionName">
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                            <button type="button" class="btn btn-primary" id="saveSessionName">Simpan</button>
+                            <button type="button" class="btn action-btn action-btn--neutral" data-bs-dismiss="modal" data-copy="actions.cancel">Batal (Cancel)</button>
+                            <button type="button" class="btn action-btn action-btn--primary" id="saveSessionName" data-copy="actions.save">Simpan (Save)</button>
                         </div>
                     </div>
                 </div>

@@ -3,6 +3,7 @@ import {
   validateRedirectForm,
   validateInterceptForm,
 } from '../utils/validation.js'
+import { copyFrom } from '../utils/copy.js'
 
 // Constants for configuration types and IDs
 export const CONFIG_KIND = {
@@ -89,7 +90,7 @@ export class ConfigManager {
         console.log('Basuki - Save completed successfully')
       } catch (error) {
         console.error('Basuki - Save error:', error)
-        alert('Error saving configuration: ' + error.message)
+        alert(copyFrom('feedback.saveErrorPrefix') + error.message)
       }
     })
   }
@@ -110,7 +111,7 @@ export class ConfigManager {
       await ConfigManager.saveConfigs(this.kind, configs)
       console.log('Basuki - Configs saved to storage')
 
-      alert('Konfigurasi disimpan')
+      alert(copyFrom('feedback.configSaved'))
       this.loadConfigs() // Reload configurations
     } catch (error) {
       console.error('Basuki - createNewConfig error:', error)
@@ -121,7 +122,7 @@ export class ConfigManager {
   async updateExistingConfig (id, values) {
     // Update the specific config using its ID
     await this.updateConfig(this.kind, id, values)
-    alert('Konfigurasi berhasil diperbarui')
+    alert(copyFrom('feedback.configUpdated'))
   }
 
   async loadConfigs () {
@@ -174,14 +175,14 @@ export class ConfigManager {
     const wrapper = document.createElement('div')
     wrapper.className = 'row-actions'
 
-    const editButton = this.createButton('Edit', 'btn btn-sm action-btn action-btn--primary',
+    const editButton = this.createButton(copyFrom('actions.edit'), 'btn btn-sm action-btn action-btn--primary',
       () => {
         this.editConfig(id)
       })
 
-    const deleteButton = this.createButton('Hapus', 'btn btn-sm action-btn action-btn--danger',
+    const deleteButton = this.createButton(copyFrom('actions.delete'), 'btn btn-sm action-btn action-btn--danger',
       () => {
-        if (confirm('Apakah anda yakin ingin menghapus konfigurasi ini?')) {
+        if (confirm(copyFrom('confirmations.deleteConfig'))) {
           this.deleteConfig(id)
         }
       })
