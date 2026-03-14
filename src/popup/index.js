@@ -5,6 +5,24 @@ import { initTooltips, loadFooter, applyFrameSafeLayout } from './utils/ui.js'
 import { createFeedbackController } from './utils/feedback.js'
 import { getStorageData } from './utils/storage.js'
 
+const ACTIVE_WORKFLOW_STORAGE_KEY = 'basuki.popup.activeWorkflow'
+
+function readRememberedWorkflow () {
+  try {
+    return window.localStorage.getItem(ACTIVE_WORKFLOW_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function persistActiveWorkflow (workflowId) {
+  try {
+    window.localStorage.setItem(ACTIVE_WORKFLOW_STORAGE_KEY, workflowId)
+  } catch {
+    // Ignore storage failures in restricted environments
+  }
+}
+
 function initWorkflowNavigation(onWorkflowChange) {
   const nav = document.getElementById('workflowNav')
   const content = document.getElementById('workflowContent')
@@ -31,6 +49,7 @@ function initWorkflowNavigation(onWorkflowChange) {
         panel.classList.add('fade')
       }
     })
+    persistActiveWorkflow(targetId)
     onWorkflowChange?.(targetId)
   }
 
@@ -43,7 +62,10 @@ function initWorkflowNavigation(onWorkflowChange) {
     })
   })
 
-  const initialTab = tabs.find((tab) => tab.classList.contains('active')) ?? tabs[0]
+  const rememberedWorkflow = readRememberedWorkflow()
+  const initialTab = tabs.find((tab) => tab.dataset.workflowTarget === rememberedWorkflow)
+    ?? tabs.find((tab) => tab.classList.contains('active'))
+    ?? tabs[0]
   if (initialTab?.dataset.workflowTarget) {
     setActiveWorkflow(initialTab.dataset.workflowTarget)
   }

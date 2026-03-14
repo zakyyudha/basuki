@@ -13,7 +13,11 @@ export function loadFooter () {
   applySharedCopy()
 
   const basukiVersion = chrome.runtime.getManifest().version
-  document.querySelector('footer div span').innerHTML = `
+  const footerLabel = document.querySelector('.popup-shell__footer .text-body-secondary')
+  if (!footerLabel) {
+    return
+  }
+  footerLabel.innerHTML = `
       <a href="https://github.com/zakyyudha/basuki" target="_blank" style="text-decoration: none">
         <span class="text-body-secondary">&copy; Basuki (v${basukiVersion})</span>
       </a>
