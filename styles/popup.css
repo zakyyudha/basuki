@@ -1,21 +1,104 @@
-html {
-    width: 600px;
+:root {
+    --popup-width: 640px;
+    --popup-min-height: 560px;
+    --shell-gap: 12px;
+    --shell-padding: 12px;
+    --shell-radius: 10px;
+}
+
+html,
+body {
+    width: var(--popup-width);
+    min-width: var(--popup-width);
+    max-width: var(--popup-width);
+    min-height: var(--popup-min-height);
+}
+
+body {
+    margin: 0;
+    overflow: hidden;
+}
+
+.popup-shell {
+    height: var(--popup-min-height);
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    gap: var(--shell-gap);
+    padding: var(--shell-padding);
+    overflow: hidden;
+}
+
+.popup-shell__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.popup-shell__eyebrow {
+    margin: 0;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.8;
+}
+
+.popup-shell__title {
+    margin: 0;
+    font-size: 1.15rem;
+    line-height: 1.2;
+}
+
+.popup-shell__nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.popup-shell__nav .nav-link {
+    white-space: nowrap;
+    text-align: center;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 999px;
+}
+
+.popup-shell__content {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--shell-radius);
+    padding: 12px;
+}
+
+.workflow-panel {
+    min-height: 100%;
+}
+
+.workflow-panel__title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.workflow-panel .tab-content {
+    padding-top: 8px;
+}
+
+.workflow-panel .table {
+    margin-bottom: 0;
+}
+
+.popup-shell__footer {
+    border-top: 1px solid var(--bs-border-color);
+    padding-top: 8px;
+    text-align: right;
+    font-size: 0.8rem;
 }
 
 .bi {
     vertical-align: -.125em;
     fill: currentColor;
-}
-
-.nav-scroller .nav {
-    display: flex;
-    flex-wrap: nowrap;
-    padding-bottom: 1rem;
-    margin-top: -1px;
-    overflow-x: auto;
-    text-align: center;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
 }
 
 .btn-bd-primary {
