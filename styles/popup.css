@@ -4,6 +4,26 @@
     --shell-gap: 12px;
     --shell-padding: 12px;
     --shell-radius: 10px;
+    --popup-font-sans: "Segoe UI", "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+    --surface-base: #f4f7fb;
+    --surface-panel: #ffffff;
+    --surface-muted: #eef3fa;
+    --text-primary: #172033;
+    --text-muted: #5a657a;
+    --line-soft: #d3dbe9;
+    --accent-primary: #1f6feb;
+    --accent-primary-strong: #1657b8;
+    --accent-danger: #cb3f4b;
+    --accent-danger-strong: #a7323d;
+    --accent-success: #117a54;
+    --accent-success-soft: #d9f5e8;
+    --accent-neutral-soft: #e7ecf5;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
 }
 
 html,
@@ -17,6 +37,9 @@ body {
 body {
     margin: 0;
     overflow: hidden;
+    font-family: var(--popup-font-sans);
+    color: var(--text-primary);
+    background: linear-gradient(160deg, #f7f9fe 0%, #eef3fc 100%);
 }
 
 .popup-shell {
@@ -66,9 +89,11 @@ body {
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    border: 1px solid var(--bs-border-color);
-    border-radius: var(--shell-radius);
-    padding: 12px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    background: var(--surface-panel);
+    box-shadow: inset 0 1px 0 #fff;
 }
 
 .workflow-panel {
@@ -82,11 +107,160 @@ body {
 }
 
 .workflow-panel .tab-content {
-    padding-top: 8px;
+    padding-top: var(--space-2);
 }
 
 .workflow-panel .table {
     margin-bottom: 0;
+}
+
+.workflow-form {
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
+    background: var(--surface-base);
+    padding: var(--space-3);
+}
+
+.workflow-field {
+    margin-bottom: var(--space-3);
+}
+
+.workflow-field:last-child {
+    margin-bottom: 0;
+}
+
+.workflow-field .form-label {
+    margin-bottom: var(--space-1);
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.workflow-field .form-control,
+.workflow-field .form-select {
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-sm);
+    background: var(--surface-panel);
+}
+
+.workflow-table.table {
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--surface-panel);
+}
+
+.workflow-table.table > :not(caption) > * > * {
+    padding: 0.5rem 0.55rem;
+    vertical-align: middle;
+}
+
+.workflow-table thead.table-dark th {
+    background: #26324a;
+    color: #f4f7fb;
+    border-color: #3a4867;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.row-actions {
+    display: inline-flex;
+    gap: var(--space-1);
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    border-radius: 999px;
+    border: 1px solid transparent;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.action-btn--primary {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: #fff;
+}
+
+.action-btn--primary:hover {
+    background: var(--accent-primary-strong);
+    border-color: var(--accent-primary-strong);
+    color: #fff;
+}
+
+.action-btn--neutral {
+    background: var(--accent-neutral-soft);
+    border-color: #d2d9e8;
+    color: var(--text-primary);
+}
+
+.action-btn--neutral:hover {
+    background: #d8dfef;
+    color: var(--text-primary);
+}
+
+.action-btn--danger {
+    background: #fbe6e8;
+    border-color: #f3c7cc;
+    color: #8e1f2b;
+}
+
+.action-btn--danger:hover {
+    background: #f5d4d8;
+    color: #7d1a25;
+}
+
+.action-btn--success {
+    background: var(--accent-success);
+    border-color: var(--accent-success);
+    color: #fff;
+}
+
+.action-btn--success:hover {
+    background: #0d6748;
+    border-color: #0d6748;
+    color: #fff;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.status-badge--active {
+    color: #0f553b;
+    background: var(--accent-success-soft);
+}
+
+.status-badge--inactive {
+    color: #4e5d76;
+    background: var(--accent-neutral-soft);
+}
+
+.empty-state {
+    border: 1px dashed var(--line-soft);
+    background: var(--surface-muted);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+}
+
+.workflow-panel .nav-tabs .nav-link {
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.workflow-panel .nav-tabs .nav-link.active {
+    border-color: var(--line-soft) var(--line-soft) transparent;
+    color: var(--accent-primary);
+    font-weight: 600;
 }
 
 .popup-shell__footer {

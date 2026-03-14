@@ -113,30 +113,30 @@
             </ul>
 
             <div class="tab-content">
-                <div class="tab-pane container active" id="createConfiguration">
+                <div class="tab-pane container active workflow-form" id="createConfiguration">
                     <input type="hidden" id="id">
-                    <div class="mb-3 mt-3">
+                    <div class="workflow-field mt-2">
                         <label for="configName" class="form-label">Nama Konfigurasi:</label>
                         <input type="text" class="form-control" id="configName" placeholder="Masukkan nama konfigurasi">
                     </div>
-                    <div class="mb-3 mt-3">
+                    <div class="workflow-field">
                         <label for="urlContains" class="form-label">Jika Pranala Berisikan:</label>
                         <input type="text" class="form-control" id="urlContains" placeholder="Masukkan potongan dari pranala">
                     </div>
-                    <div class="mb-3 mt-3">
+                    <div class="workflow-field">
                         <label for="replaceText" class="form-label">Maka Ubah:</label>
                         <input type="text" class="form-control" id="replaceText" placeholder="Masukkan teks yang ingin diubah">
                     </div>
-                    <div class="mb-3 mt-3">
+                    <div class="workflow-field">
                         <label for="withText" class="form-label">Dengan:</label>
                         <input type="text" class="form-control" id="withText" placeholder="Masukkan teks pengganti">
                     </div>
                     <div class="d-grid">
-                        <button id="save" class="btn btn-primary btn-block">Simpan</button>
+                        <button id="save" class="btn action-btn action-btn--primary btn-block">Simpan</button>
                     </div>
                 </div>
                 <div class="tab-pane container fade" id="configurations">
-                    <table class="table table-hover mt-3" id="configTable">
+                    <table class="table table-hover mt-3 workflow-table" id="configTable">
                         <thead class="table-dark">
                         <tr>
                             <th>Nama Konfigurasi</th>
@@ -163,21 +163,21 @@
                 </li>
             </ul>
             <div class="tab-content">
-                <div class="tab-pane container active" id="intercept-createConfiguration">
+                <div class="tab-pane container active workflow-form" id="intercept-createConfiguration">
                     <input type="hidden" id="interceptId">
-                    <div class="mb-3 mt-3">
+                    <div class="workflow-field mt-2">
                         <label for="interceptConfigName" class="form-label">Nama Konfigurasi:</label>
                         <input type="text" class="form-control" id="interceptConfigName" placeholder="Masukkan nama konfigurasi">
                     </div>
-                    <div class="mb-3 mt-3">
+                    <div class="workflow-field">
                         <label for="interceptUrlContains" class="form-label">Jika Pranala Berisikan:</label>
                         <input type="text" class="form-control" id="interceptUrlContains" placeholder="Masukkan potongan dari pranala">
                     </div>
-                    <div class="mb-3 mt-3">
+                    <div class="workflow-field">
                         <label for="interceptHttpStatusCode" class="form-label">Kode Status HTTP:</label>
                         <input type="number" min="100" max="599" value="200" class="form-control" id="interceptHttpStatusCode" placeholder="Masukkan Kode Status HTTP">
                     </div>
-                    <div class="mb-3 mt-3">
+                    <div class="workflow-field">
                         <label for="interceptRequestMethod" class="form-label">Metode <i>Request</i>:</label>
                         <select class="form-select" id="interceptRequestMethod">
                             <option value="GET">GET</option>
@@ -189,16 +189,16 @@
                             <option value="HEAD">HEAD</option>
                         </select>
                     </div>
-                    <div class="mb-3 mt-3">
+                    <div class="workflow-field">
                         <label for="interceptResponseBody" class="form-label">Respon <i>Body</i>:</label>
                         <textarea class="form-control" id="interceptResponseBody" rows="10" placeholder="Masukkan Respon API"></textarea>
                     </div>
                     <div class="d-grid">
-                        <button id="intercept-save" class="btn btn-primary btn-block">Simpan</button>
+                        <button id="intercept-save" class="btn action-btn action-btn--primary btn-block">Simpan</button>
                     </div>
                 </div>
                 <div class="tab-pane container fade" id="intercept-configurations">
-                    <table class="table table-hover mt-3" id="intercept-configTable">
+                    <table class="table table-hover mt-3 workflow-table" id="intercept-configTable">
                         <thead class="table-dark">
                         <tr>
                             <th>Nama Konfigurasi</th>
@@ -215,18 +215,18 @@
 
         <section class="workflow-panel tab-pane fade" id="sessionIsolation" role="tabpanel" aria-labelledby="workflow-sessions-tab">
             <h2 class="workflow-panel__title">Isolasi Sesi</h2>
-            <div class="mb-3 mt-3">
+            <div class="mb-3 mt-3 workflow-form">
                 <label for="newIsolationUrl" class="form-label">URL Tab Baru:</label>
                 <div class="input-group">
                     <input type="text" class="form-control" id="newIsolationUrl" placeholder="Masukkan URL untuk membuat tab terisolasi baru">
-                    <button class="btn btn-success" id="createIsolatedTab">Buat Tab</button>
+                    <button class="btn action-btn action-btn--success" id="createIsolatedTab">Buat Tab</button>
                 </div>
             </div>
 
             <div class="mb-3">
                 <h5>Tab Terisolasi Aktif</h5>
                 <div class="table-responsive">
-                    <table class="table table-hover" id="isolatedTabsTable">
+                    <table class="table table-hover workflow-table" id="isolatedTabsTable">
                         <thead class="table-dark">
                         <tr>
                             <th>Nama</th>
@@ -238,13 +238,13 @@
                         <tbody id="isolatedTabsList"></tbody>
                     </table>
                 </div>
-                <div id="noIsolatedTabs" class="alert alert-secondary text-center">
+                <div id="noIsolatedTabs" class="alert text-center empty-state">
                     Tidak ada tab terisolasi aktif saat ini.
                 </div>
             </div>
 
             <div class="d-grid gap-2">
-                <a href="#" class="btn btn-danger" id="isolation-clearSessionIsolation">Hapus Semua Sesi</a>
+                <a href="#" class="btn action-btn action-btn--danger" id="isolation-clearSessionIsolation">Hapus Semua Sesi</a>
             </div>
 
             <div class="modal fade" id="renameSessionModal" tabindex="-1" aria-hidden="true">
