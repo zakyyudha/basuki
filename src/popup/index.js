@@ -1,9 +1,11 @@
 import { ConfigManager, CONFIG_KIND, VALUE_IDS } from './modules/configManager.js'
 import { validateRedirectForm, validateInterceptForm } from './utils/validation.js'
 import { SessionIsolationManager } from './modules/sessionIsolationUI.js'
-import { initTooltips, loadFooter } from './utils/ui.js'
+import { initTooltips, loadFooter, applyFrameSafeLayout } from './utils/ui.js'
+import { createFeedbackController } from './utils/feedback.js'
+import { getStorageData } from './utils/storage.js'
 
-function initWorkflowNavigation() {
+function initWorkflowNavigation(onWorkflowChange) {
   const nav = document.getElementById('workflowNav')
   const content = document.getElementById('workflowContent')
 
@@ -29,6 +31,7 @@ function initWorkflowNavigation() {
         panel.classList.add('fade')
       }
     })
+    onWorkflowChange?.(targetId)
   }
 
   tabs.forEach((tab) => {
@@ -46,27 +49,78 @@ function initWorkflowNavigation() {
   }
 }
 
+async function loadActiveWorkflowSummary () {
+  const redirectNode = document.getElementById('summaryRedirectCount')
+  const interceptNode = document.getElementById('summaryInterceptCount')
+  const sessionNode = document.getElementById('summarySessionState')
+
+  if (!redirectNode || !interceptNode || !sessionNode) {
+    return
+  }
+
+  const [storage, sessionResponse] = await Promise.all([
+    getStorageData(['apiRedirect', 'apiIntercept']),
+    new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'getIsolatedTabs' }, (response) => {
+        resolve(response || {})
+      })
+    }),
+  ])
+
+  const activeRedirects = (storage.apiRedirect?.configs || []).filter(config => config.enabled).length
+  const activeIntercepts = (storage.apiIntercept?.configs || []).filter(config => config.enabled).length
+  const isolatedTabs = sessionResponse.isolatedTabs || []
+  const activeSessions = isolatedTabs.filter(tab => tab.active).length
+
+  redirectNode.textContent = String(activeRedirects)
+  interceptNode.textContent = String(activeIntercepts)
+  sessionNode.textContent = activeSessions > 0
+    ? `${activeSessions} aktif dari ${isolatedTabs.length}`
+    : (isolatedTabs.length > 0 ? `${isolatedTabs.length} sesi tidak aktif` : 'Tidak ada sesi aktif')
+}
+
 // Initial setup
 document.addEventListener('DOMContentLoaded', function () {
-  initWorkflowNavigation()
+  applyFrameSafeLayout()
+  const feedback = createFeedbackController()
+  const refreshSummary = () => {
+    loadActiveWorkflowSummary().catch((error) => {
+      console.error('Basuki - Failed to load summary:', error)
+      feedback.show('Gagal memuat ringkasan status aktif', 'error')
+    })
+  }
+
+  initWorkflowNavigation(() => {
+    refreshSummary()
+  })
 
   // Initialize Bootstrap Tooltips
   initTooltips()
 
   // Initialize Config Managers
-  const apiRedirectManager = new ConfigManager(CONFIG_KIND.API_REDIRECT, VALUE_IDS.API_REDIRECT)
+  const apiRedirectManager = new ConfigManager(CONFIG_KIND.API_REDIRECT, VALUE_IDS.API_REDIRECT, {
+    feedback,
+    onStateChanged: refreshSummary,
+  })
   apiRedirectManager.saveInput('save', validateRedirectForm)
   apiRedirectManager.loadConfigs()
 
-  const apiInterceptManager = new ConfigManager(CONFIG_KIND.API_INTERCEPT, VALUE_IDS.API_INTERCEPT)
+  const apiInterceptManager = new ConfigManager(CONFIG_KIND.API_INTERCEPT, VALUE_IDS.API_INTERCEPT, {
+    feedback,
+    onStateChanged: refreshSummary,
+  })
   apiInterceptManager.saveInput('intercept-save', validateInterceptForm)
   apiInterceptManager.loadConfigs()
 
   // Initialize Session Isolation Manager
-  new SessionIsolationManager()
+  new SessionIsolationManager({
+    feedback,
+    onStateChanged: refreshSummary,
+  })
 
   // Load footer with version number
   loadFooter()
+  refreshSummary()
 
   // Event listener for JSON formatting in interceptResponseBody
   document.getElementById('interceptResponseBody').addEventListener('input', function () {
@@ -80,4 +134,15 @@ document.addEventListener('DOMContentLoaded', function () {
       textArea.classList.add('is-invalid')
     }
   })
+
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace !== 'local') {
+      return
+    }
+    if (changes.apiRedirect || changes.apiIntercept || changes.sessionIsolation) {
+      refreshSummary()
+    }
+  })
+
+  window.addEventListener('resize', applyFrameSafeLayout)
 })

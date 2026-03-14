@@ -99,6 +99,23 @@
         </button>
     </nav>
 
+    <section class="popup-shell__summary" id="workflowSummary" aria-live="polite">
+        <article class="summary-card">
+            <p class="summary-card__label">Redirects Aktif</p>
+            <p class="summary-card__value" id="summaryRedirectCount">0</p>
+        </article>
+        <article class="summary-card">
+            <p class="summary-card__label">Intercepts Aktif</p>
+            <p class="summary-card__value" id="summaryInterceptCount">0</p>
+        </article>
+        <article class="summary-card">
+            <p class="summary-card__label">Sesi Terisolasi</p>
+            <p class="summary-card__value" id="summarySessionState">Tidak ada sesi aktif</p>
+        </article>
+    </section>
+
+    <section class="popup-shell__feedback" id="popupFeedback" aria-live="polite" role="status" hidden></section>
+
     <section class="popup-shell__content tab-content" id="workflowContent">
         <section class="workflow-panel tab-pane show active" id="apiRedirector" role="tabpanel" aria-labelledby="workflow-redirects-tab">
             <h2 class="workflow-panel__title">Pengalihan API</h2>

@@ -20,6 +20,12 @@ export function loadFooter () {
     `
 }
 
+export function applyFrameSafeLayout () {
+  const viewportHeight = window.innerHeight || 0
+  const safeHeight = Math.max(520, Math.min(760, viewportHeight || 560))
+  document.documentElement.style.setProperty('--popup-min-height', `${safeHeight}px`)
+}
+
 function applySharedCopy () {
   document.querySelectorAll('[data-copy]').forEach((node) => {
     const key = node.getAttribute('data-copy')
