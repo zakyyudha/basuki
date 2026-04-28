@@ -27,6 +27,7 @@ function rewritePopupHtml(rawHtml) {
     .replace(/<link\s+href="assets\/dist\/css\/bootstrap\.min\.css"\s+rel="stylesheet">\n?/g, '')
     .replace(/<script\s+src="assets\/dist\/js\/bootstrap\.bundle\.min\.js"><\/script>\n?/g, '')
     .replace('src="./src/popup/index.js"', 'src="./popup.js"')
+    .replace('</head>', '  <link rel="stylesheet" href="./assets/style.css">\n</head>')
 }
 
 function rewriteManifest(rawManifest) {
