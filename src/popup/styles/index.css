@@ -487,3 +487,22 @@ code, pre { font-family: var(--font-mono); }
   gap: 8px;
 }
 .popup-fallback h2 { color: var(--foreground); font-size: 13px; }
+
+/* ── Debug action buttons (2-col export/import) ─────────────────────────── */
+.debug-action-btn {
+  border-radius: 6px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  padding: 8px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: oklch(0.85 0.005 270);
+  transition: border-color 0.15s, color 0.15s;
+  text-align: center;
+}
+.debug-action-btn:hover {
+  border-color: oklch(0.82 0.15 210 / 0.4);
+  color: var(--backlight);
+}

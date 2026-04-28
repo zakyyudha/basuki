@@ -187,26 +187,71 @@ function SessionsPanel({ lang, sessions, onLaunch, onClose, onAdd }) {
 }
 
 /* ── Debug panel ──────────────────────────────────────────────────────────── */
+function SumRow({ k, v, accent, full }) {
+  return (
+    <div style={{
+      gridColumn: full ? 'span 2' : undefined,
+      display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+      borderRadius: 6, border: '1px solid var(--hairline)',
+      background: 'oklch(0.13 0.008 280 / 40%)',
+      padding: '6px 8px',
+    }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>{k}</span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontVariantNumeric: 'tabular-nums', color: accent ? 'var(--backlight)' : 'oklch(0.85 0.005 270)' }}>{v}</span>
+    </div>
+  )
+}
+
 function DebugPanel({ lang, systemState, redirects, intercepts, sessions }) {
+  const totals = {
+    redirects: redirects.length,
+    intercepts: intercepts.length,
+    sessions: sessions.length,
+    activeRedirects: redirects.filter(r => r.enabled).length,
+    activeIntercepts: intercepts.filter(r => r.enabled).length,
+    activeSessions: sessions.filter(s => s.active).length,
+    hits: redirects.reduce((s, r) => s + (r.hits || 0), 0),
+  }
   return (
     <div className="panel-shell">
       <div className="panel-shell__head">
         <span className="panel-shell__label">{t('panel_debug', lang)}</span>
+        <span className="panel-shell__counter">000</span>
       </div>
       <div className="panel-shell__body">
-        <div className="rule-card">
-          <div style={{fontSize:'9px',fontFamily:'var(--font-mono)',letterSpacing:'0.1em',textTransform:'uppercase',color:'var(--muted)',marginBottom:8}}>{t('debug_summary', lang)}</div>
-          {[
-            [t('debug_total_redirects', lang), redirects.length],
-            [t('debug_total_intercepts', lang), intercepts.length],
-            [t('debug_total_sessions', lang), sessions.length],
-            [t('debug_system', lang), systemState],
-          ].map(([k,v]) => (
-            <KvRow key={k} k={k} v={String(v)} />
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <button className="debug-action-btn">↓ {t('debug_export', lang)}</button>
+          <button className="debug-action-btn">↑ {t('debug_import', lang)}</button>
         </div>
-        <button className="btn-add-rule" style={{color:'var(--muted)',borderStyle:'solid'}}>{t('debug_export', lang)}</button>
-        <button className="btn-add-rule" style={{color:'var(--muted)',borderStyle:'solid'}}>{t('debug_import', lang)}</button>
+        <section className="rule-card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span className="panel-shell__label">{t('debug_summary', lang)}</span>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase',
+              color: systemState === 'off' ? 'oklch(0.4 0.01 270)' : systemState === 'intercepting' ? 'var(--warn)' : 'var(--backlight)'
+            }}>{systemState}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <SumRow k={t('debug_total_redirects', lang)}   v={totals.redirects} />
+            <SumRow k={t('debug_active_redirects', lang)}  v={totals.activeRedirects} accent />
+            <SumRow k={t('debug_total_intercepts', lang)}  v={totals.intercepts} />
+            <SumRow k={t('debug_active_intercepts', lang)} v={totals.activeIntercepts} accent />
+            <SumRow k={t('debug_total_sessions', lang)}    v={totals.sessions} />
+            <SumRow k={t('debug_active_sessions', lang)}   v={totals.activeSessions} accent />
+            <SumRow k={t('debug_total_hits', lang)} v={totals.hits.toLocaleString()} accent full />
+          </div>
+        </section>
+        <section className="rule-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: '1px solid var(--hairline)' }}>
+            <span className="panel-shell__label">{t('debug_logs', lang)}</span>
+            <button className="btn-delete" style={{ padding: '2px 8px' }}>{t('debug_clear', lang)}</button>
+          </div>
+          <div style={{ maxHeight: 160, overflowY: 'auto', padding: 8 }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
+              {t('debug_no_logs', lang)}
+            </p>
+          </div>
+        </section>
       </div>
     </div>
   )
