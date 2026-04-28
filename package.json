@@ -1,0 +1,29 @@
+{
+  "name": "basuki",
+  "version": "1.0.0",
+  "description": "**Basuki** is a Chrome extension designed to help developers with API testing, debugging, and development workflows. This tool allows you to redirect API requests, mock responses, and create isolated browser sessions for different environments.",
+  "main": "index.js",
+  "scripts": {
+    "build": "vite build",
+    "build:dev": "vite build --mode development",
+    "watch": "vite build --mode development --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zakyyudha/basuki.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zakyyudha/basuki/issues"
+  },
+  "homepage": "https://github.com/zakyyudha/basuki#readme",
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vite": "^6.0.6"
+  }
+}
