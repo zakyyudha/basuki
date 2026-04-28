@@ -105,12 +105,12 @@ export function RedirectEditor({ lang, rule, isNew, onSave, onDelete, onClose })
           value={draft.name || ''} maxLength={60} placeholder="My Redirect"
           onChange={e => setDraft({ ...draft, name: e.target.value })} />
       </Field>
-      <Field label={t('field_from', lang)} hint="match URL or pattern" error={errors.from}>
+      <Field label={t('field_from', lang)} hint={t('field_from_hint', lang)} error={errors.from}>
         <input className={`editor-input${errors.from ? ' error' : ''}`}
           value={draft.from || ''} maxLength={500} placeholder="https://api.example.com/*"
           onChange={e => setDraft({ ...draft, from: e.target.value })} />
       </Field>
-      <Field label={t('field_to', lang)} hint="redirect target" error={errors.to}>
+      <Field label={t('field_to', lang)} hint={t('field_to_hint', lang)} error={errors.to}>
         <input className={`editor-input${errors.to ? ' error' : ''}`}
           value={draft.to || ''} maxLength={500} placeholder="http://localhost:3000"
           onChange={e => setDraft({ ...draft, to: e.target.value })} />
@@ -132,12 +132,22 @@ export function InterceptEditor({ lang, rule, isNew, onSave, onDelete, onClose }
 
   const handleSave = () => {
     const errs = {}
+    const method = (draft.method || '').toUpperCase()
+    const status = Number(draft.status)
     if (!draft.name?.trim()) errs.name = t('err_required', lang)
+    if (!METHODS.includes(method)) errs.method = t('err_required', lang)
     if (!draft.pattern?.trim()) errs.pattern = t('err_required', lang)
-    if (!draft.status || draft.status < 100 || draft.status > 599) errs.status = t('err_status_range', lang)
+    if (!Number.isInteger(status) || status < 100 || status > 599) errs.status = t('err_status_range', lang)
     if (Object.keys(errs).length) { setErrors(errs); return }
     setErrors({})
-    onSave({ ...draft, name: draft.name.trim(), pattern: draft.pattern.trim() })
+    onSave({
+      ...draft,
+      name: draft.name.trim(),
+      method: (draft.method || 'GET').toUpperCase(),
+      pattern: draft.pattern.trim(),
+      status: Number(draft.status),
+      body: draft.body || '',
+    })
   }
 
   return (
@@ -150,7 +160,7 @@ export function InterceptEditor({ lang, rule, isNew, onSave, onDelete, onClose }
           value={draft.name || ''} maxLength={60}
           onChange={e => setDraft({ ...draft, name: e.target.value })} />
       </Field>
-      <Field label={t('field_method', lang)}>
+      <Field label={t('field_method', lang)} error={errors.method}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {METHODS.map(m => (
             <button key={m} type="button"
@@ -161,7 +171,7 @@ export function InterceptEditor({ lang, rule, isNew, onSave, onDelete, onClose }
           ))}
         </div>
       </Field>
-      <Field label={t('field_pattern', lang)} hint="URL or regex match" error={errors.pattern}>
+      <Field label={t('field_pattern', lang)} hint={t('field_pattern_hint', lang)} error={errors.pattern}>
         <input className={`editor-input${errors.pattern ? ' error' : ''}`}
           value={draft.pattern || ''} maxLength={500} placeholder="/api/v2/auth/status"
           onChange={e => setDraft({ ...draft, pattern: e.target.value })} />
@@ -172,7 +182,7 @@ export function InterceptEditor({ lang, rule, isNew, onSave, onDelete, onClose }
           value={draft.status || 200}
           onChange={e => setDraft({ ...draft, status: Number(e.target.value) || 0 })} />
       </Field>
-      <Field label={t('field_body', lang)} hint="JSON or raw" error={errors.body}>
+      <Field label={t('field_body', lang)} hint={t('field_body_hint', lang)} error={errors.body}>
         <textarea className="editor-textarea"
           value={draft.body || ''} maxLength={20000} placeholder='{ "ok": true }'
           onChange={e => setDraft({ ...draft, body: e.target.value })} />
@@ -211,12 +221,12 @@ export function SessionEditor({ lang, session, isNew, onSave, onDelete, onClose 
           value={draft.name || ''} maxLength={60}
           onChange={e => setDraft({ ...draft, name: e.target.value })} />
       </Field>
-      <Field label={t('field_origin', lang)} error={errors.origin}>
+      <Field label={t('field_origin', lang)} hint={t('field_origin_hint', lang)} error={errors.origin}>
         <input className={`editor-input${errors.origin ? ' error' : ''}`}
           value={draft.origin || ''} maxLength={253} placeholder="app.example.com"
           onChange={e => setDraft({ ...draft, origin: e.target.value })} />
       </Field>
-      <Field label={t('field_ua', lang)}>
+      <Field label={t('field_ua', lang)} hint={t('field_ua_hint', lang)}>
         <input className="editor-input"
           value={draft.userAgent || ''} maxLength={300} placeholder="Desktop/Chrome"
           onChange={e => setDraft({ ...draft, userAgent: e.target.value })} />

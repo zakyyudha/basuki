@@ -1,18 +1,21 @@
 {
   "manifest_version": 3,
   "name": "Basuki",
-  "version": "2.0.0",
-  "description": "Basuki is a Chrome extension designed to help developers intercept and modify API requests in real time. This tool allows you to dynamically replace parts of URLs in API requests, making it ideal for debugging and local development environments where you want to redirect live API calls to a local server.",
+  "version": "3.0.0",
+  "description": "Basuki is a Chrome extension designed to help developers with API testing, debugging, and development workflows. This tool allows you to redirect API requests, mock responses, and create isolated browser sessions for different environments.",
   "permissions": [
     "storage",
     "unlimitedStorage",
     "notifications",
     "contextMenus",
     "cookies",
-    "scripting"
+    "scripting",
+    "tabs",
+    "windows"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/background/index.js",
+    "type": "module"
   },
   "action": {
     "default_popup": "popup.html"
@@ -23,7 +26,7 @@
         "<all_urls>"
       ],
       "js": [
-        "scripts/content.client.js"
+        "src/content/index.js"
       ],
       "run_at": "document_start"
     }
@@ -31,7 +34,9 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "scripts/basuki.intercept.js"
+        "src/content/intercept.js",
+        "intercept.js",
+        "chunks/*.js"
       ],
       "matches": [
         "<all_urls>"

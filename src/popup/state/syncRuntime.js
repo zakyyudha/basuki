@@ -7,7 +7,7 @@ import { listInterceptConfigs } from '../adapters/interceptAdapter.js'
 import { listRedirectConfigs } from '../adapters/redirectAdapter.js'
 import { getIsolatedTabs } from '../adapters/sessionAdapter.js'
 
-const WATCHED_KEYS = new Set(['apiRedirect', 'apiIntercept', 'sessionIsolation'])
+const WATCHED_KEYS = new Set(['apiRedirect', 'apiIntercept', 'sessionIsolation', 'basukiLogs'])
 
 async function refreshByDomain(domain) {
   switch (domain) {
@@ -97,7 +97,9 @@ export function createRuntimeSync({ onChange, onDebug } = {}) {
     if (watched.includes('apiRedirect')) domains.push('redirect')
     if (watched.includes('apiIntercept')) domains.push('intercept')
     if (watched.includes('sessionIsolation')) domains.push('session')
-    domains.push('debug')
+    // basukiLogs changes trigger a debug refresh (runtime logs from content script).
+    // Rule/session storage changes also affect live summary counters.
+    if (watched.includes('basukiLogs') || watched.includes('apiRedirect') || watched.includes('apiIntercept') || watched.includes('sessionIsolation')) domains.push('debug')
 
     const refreshed = await refreshDomains(domains)
     onChange?.({ source: 'storage.onChanged', watched, domains, ...refreshed })

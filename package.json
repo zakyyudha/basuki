@@ -1,6 +1,6 @@
 {
   "name": "basuki",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "description": "**Basuki** is a Chrome extension designed to help developers with API testing, debugging, and development workflows. This tool allows you to redirect API requests, mock responses, and create isolated browser sessions for different environments.",
   "main": "index.js",
   "scripts": {

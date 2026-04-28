@@ -1,5 +1,39 @@
 import { runtimeSendMessage } from './chromeClient.js'
 
+function getFallbackOrigin(session) {
+  const candidate = session.origin || session.host || session.url
+
+  if (!candidate) return 'Unknown origin'
+
+  try {
+    const parsed = candidate.includes('://')
+      ? new URL(candidate)
+      : new URL(`https://${candidate}`)
+    return parsed.host || candidate
+  } catch (error) {
+    return String(candidate)
+  }
+}
+
+function normalizeSession(session, index = 0) {
+  const isolationId = session.isolationId ?? session.id ?? session.tabId ?? `session-${index}`
+  const fallbackOrigin = getFallbackOrigin(session)
+  const url = session.url || (fallbackOrigin === 'Unknown origin' ? '' : `https://${fallbackOrigin}`)
+
+  return {
+    ...session,
+    id: session.id ?? isolationId,
+    isolationId,
+    tabId: session.tabId ?? null,
+    name: session.name || `Session ${index + 1}`,
+    origin: session.origin || fallbackOrigin,
+    url,
+    active: Boolean(session.active),
+    createdAt: session.createdAt || null,
+    updatedAt: session.updatedAt || session.createdAt || null,
+  }
+}
+
 function withSafeSessionList(result) {
   if (!result.ok) {
     return {
@@ -12,10 +46,10 @@ function withSafeSessionList(result) {
   return {
     ok: true,
     data: {
-      isolatedTabs: Array.isArray(result.data?.isolatedTabs)
-        ? result.data.isolatedTabs
-        : [],
       ...result.data,
+      isolatedTabs: Array.isArray(result.data?.isolatedTabs)
+        ? result.data.isolatedTabs.map(normalizeSession)
+        : [],
     },
     error: null,
   }

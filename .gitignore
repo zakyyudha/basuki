@@ -16,6 +16,17 @@ dist/
 *~
 .DS_Store
 
+# Vibe coding
+.opencode/
+.claude/
+.codex/
+.antigravity/
+.planning/
+.agents/
+.agent/
+skills-lock.json
+GEMINI.md
+
 # Chrome Extension
 *.pem
 *.crx

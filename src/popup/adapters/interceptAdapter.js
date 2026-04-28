@@ -1,8 +1,28 @@
-import { CONFIG_KIND } from '../utils/constants.js'
+import { CONFIG_KIND } from '../constants/config.js'
 import { storageGet, storageSet } from './chromeClient.js'
 
 const EMPTY_DOMAIN = {
   configs: [],
+}
+
+/**
+ * Normalize a stored config (either legacy/runtime or UI format) to UI-friendly shape.
+ * Runtime format: { interceptConfigName, interceptRequestMethod, interceptUrlContains,
+ *                   interceptHttpStatusCode, interceptResponseBody, enabled, debug }
+ * UI format:      { name, method, pattern, status, body, enabled, debug }
+ */
+function normalizeToUi(config = {}) {
+  return {
+    ...config,
+    id: toNumberId(config.id),
+    name: config.name || config.interceptConfigName || '',
+    method: (config.method || config.interceptRequestMethod || 'GET').toUpperCase(),
+    pattern: config.pattern || config.interceptUrlContains || '',
+    status: Number(config.status ?? config.interceptHttpStatusCode ?? 200),
+    body: config.body ?? config.interceptResponseBody ?? '',
+    enabled: config.enabled ?? true,
+    debug: config.debug ?? false,
+  }
 }
 
 function normalizeConfigs(raw) {
@@ -10,7 +30,7 @@ function normalizeConfigs(raw) {
     return []
   }
 
-  return raw.configs
+  return raw.configs.map(normalizeToUi)
 }
 
 function toNumberId(id) {
@@ -34,13 +54,33 @@ async function readDomain() {
   })
 }
 
-async function writeDomain(configs) {
+/**
+ * Convert UI-format config to canonical runtime-compatible storage format.
+ * Content runtime reads `interceptUrlContains`, `interceptRequestMethod`,
+ * `interceptHttpStatusCode`, and `interceptResponseBody` directly.
+ */
+export function createInterceptConfig(payload = {}) {
+  return {
+    id: toNumberId(payload?.id),
+    interceptConfigName: (payload?.name || payload?.interceptConfigName || '').trim(),
+    interceptRequestMethod: (payload?.method || payload?.interceptRequestMethod || 'GET').toUpperCase(),
+    interceptUrlContains: (payload?.pattern || payload?.interceptUrlContains || '').trim(),
+    interceptHttpStatusCode: Number(payload?.status ?? payload?.interceptHttpStatusCode ?? 200),
+    interceptResponseBody: payload?.body ?? payload?.interceptResponseBody ?? '',
+    enabled: payload?.enabled ?? true,
+    debug: payload?.debug ?? false,
+  }
+}
+
+async function writeDomain(uiConfigs) {
+  // Convert UI-format arrays to runtime-compatible storage format before persisting.
+  const storageConfigs = uiConfigs.map((config) => createInterceptConfig(config))
   const payload = {
-    [CONFIG_KIND.API_INTERCEPT]: { configs },
+    [CONFIG_KIND.API_INTERCEPT]: { configs: storageConfigs },
   }
 
   const response = await storageSet(payload)
-  return toResult(response.ok, payload[CONFIG_KIND.API_INTERCEPT], response.error)
+  return toResult(response.ok, storageConfigs.map(normalizeToUi), response.error)
 }
 
 export async function listInterceptConfigs() {
@@ -52,24 +92,15 @@ export async function listInterceptConfigs() {
   }
 }
 
-export function createInterceptConfig(payload) {
-  return {
-    ...payload,
-    id: toNumberId(payload?.id),
-    enabled: payload?.enabled ?? true,
-    debug: payload?.debug ?? false,
-  }
-}
-
 export async function addInterceptConfig(payload) {
   const current = await readDomain()
 
-  const nextConfigs = [...current.data.configs, createInterceptConfig(payload)]
-  const saved = await writeDomain(nextConfigs)
+  const nextUiConfigs = [...current.data.configs, normalizeToUi(createInterceptConfig(payload))]
+  const saved = await writeDomain(nextUiConfigs)
 
   return {
     ok: saved.ok,
-    data: nextConfigs,
+    data: saved.data,
     error: current.error || saved.error,
   }
 }
@@ -78,21 +109,17 @@ export async function updateInterceptConfig(id, updates = {}) {
   const current = await readDomain()
   const targetId = Number(id)
 
-  const nextConfigs = current.data.configs.map((config) =>
+  const nextUiConfigs = current.data.configs.map((config) =>
     config.id === targetId
-      ? {
-          ...config,
-          ...updates,
-          id: config.id,
-        }
+      ? { ...config, ...updates, id: config.id }
       : config,
   )
 
-  const saved = await writeDomain(nextConfigs)
+  const saved = await writeDomain(nextUiConfigs)
 
   return {
     ok: saved.ok,
-    data: nextConfigs,
+    data: saved.data,
     error: current.error || saved.error,
   }
 }
@@ -109,12 +136,12 @@ export async function deleteInterceptConfig(id) {
   const current = await readDomain()
   const targetId = Number(id)
 
-  const nextConfigs = current.data.configs.filter((config) => config.id !== targetId)
-  const saved = await writeDomain(nextConfigs)
+  const nextUiConfigs = current.data.configs.filter((config) => config.id !== targetId)
+  const saved = await writeDomain(nextUiConfigs)
 
   return {
     ok: saved.ok,
-    data: nextConfigs,
+    data: saved.data,
     error: current.error || saved.error,
   }
 }

@@ -46,7 +46,7 @@ function rewriteManifest(rawManifest) {
   }
 
   if (Array.isArray(manifest.web_accessible_resources) && manifest.web_accessible_resources[0]) {
-    manifest.web_accessible_resources[0].resources = ['intercept.js']
+    manifest.web_accessible_resources[0].resources = ['intercept.js', 'chunks/*.js']
   }
 
   if (!manifest.action) {
