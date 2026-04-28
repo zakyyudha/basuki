@@ -722,3 +722,41 @@ code, pre { font-family: var(--font-mono); }
   margin-bottom: 16px;
 }
 .confirm-box__actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ── Method badge ────────────────────────────────────────────────────────── */
+.method-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 3px;
+  border: 1px solid;
+  padding: 2px 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.method-badge--get    { background: oklch(0.82 0.15 210 / 0.08); color: var(--backlight);              border-color: oklch(0.82 0.15 210 / 0.3); }
+.method-badge--post   { background: oklch(0.78 0.17 155 / 0.08); color: oklch(0.78 0.17 155);         border-color: oklch(0.78 0.17 155 / 0.3); }
+.method-badge--put    { background: oklch(0.82 0.16 75 / 0.08);  color: oklch(0.82 0.16 75);           border-color: oklch(0.82 0.16 75 / 0.3); }
+.method-badge--patch  { background: oklch(0.75 0.18 300 / 0.08); color: oklch(0.75 0.18 300);         border-color: oklch(0.75 0.18 300 / 0.3); }
+.method-badge--delete { background: oklch(0.68 0.22 22 / 0.08);  color: oklch(0.82 0.17 22);          border-color: oklch(0.68 0.22 22 / 0.3); }
+.method-badge--all    { background: oklch(0.45 0.01 270 / 0.15); color: oklch(0.7 0.01 270);          border-color: oklch(0.45 0.01 270 / 0.4); }
+
+/* ── Status badge ────────────────────────────────────────────────────────── */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+.status-badge--green  { background: oklch(0.78 0.17 155 / 0.08); color: oklch(0.78 0.17 155); border-color: oklch(0.78 0.17 155 / 0.3); }
+.status-badge--sky    { background: oklch(0.82 0.15 210 / 0.08); color: var(--backlight);      border-color: oklch(0.82 0.15 210 / 0.3); }
+.status-badge--amber  { background: oklch(0.82 0.16 75 / 0.08);  color: oklch(0.82 0.16 75);  border-color: oklch(0.82 0.16 75 / 0.3); }
+.status-badge--rose   { background: oklch(0.68 0.22 22 / 0.08);  color: oklch(0.82 0.17 22);  border-color: oklch(0.68 0.22 22 / 0.3); }
