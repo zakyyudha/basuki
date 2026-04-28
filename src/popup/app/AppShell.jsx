@@ -30,15 +30,16 @@ function Toggle({ checked, onChange, label }) {
   )
 }
 
-/* ── Status icon ──────────────────────────────────────────────────────────── */
-function StatusIconSvg({ state }) {
-  const c = { off: { bg: '#2a2a35', bolt: '#4b4b60' }, on: { bg: '#1a2e3a', bolt: '#22d3ee' }, intercepting: { bg: '#1a2e3a', bolt: '#22d3ee' } }
-  const { bg, bolt } = c[state] || c.on
+/* ── Basuki icon (real PNG from rework assets) ────────────────────────────── */
+function BasukiIcon({ state }) {
+  const src = state === 'off'
+    ? './assets/icon_disabled.png'
+    : state === 'intercepting'
+      ? './assets/icon_intercepted.png'
+      : './assets/icon_enabled.png'
   return (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <rect width="22" height="22" rx="5" fill={bg} />
-      <path d="M13 3L7 12h5l-1 7 8-10h-5l1-6z" fill={bolt} stroke={bolt} strokeWidth="0.5" strokeLinejoin="round" />
-    </svg>
+    <img src={src} alt={`Basuki ${state}`}
+      style={{ width: 32, height: 32, objectFit: 'contain', imageRendering: 'crisp-edges' }} />
   )
 }
 
@@ -375,7 +376,7 @@ export function AppShell({ state, store, onLanguageChange }) {
       <header className="popup-header">
         <div className="popup-header__left">
           <button className="popup-icon-btn" onClick={() => setSystemOn(v => !v)} aria-label={t('toggle_system', lang)}>
-            <StatusIconSvg state={systemState} />
+            <BasukiIcon state={systemState} />
           </button>
           <div className="popup-brand">
             <div className="popup-brand__name">BASUKI<span>v2.4.0</span></div>
@@ -461,10 +462,25 @@ export function AppShell({ state, store, onLanguageChange }) {
             <span className="popup-stat__value accent">{totalHits.toLocaleString()}</span>
           </div>
         </div>
-        <button className={`btn-pause-all${systemOn ? '' : ' resume'}`} onClick={() => setSystemOn(v => !v)}>
-          <span className="btn-pause-all__dot" />
-          {systemOn ? t('footer_quick_toggle', lang) : t('footer_quick_resume', lang)}
-        </button>
+        <div className="popup-footer__actions">
+          <button className={`btn-pause-all${systemOn ? '' : ' resume'}`} onClick={() => setSystemOn(v => !v)} title={systemOn ? 'Pause all active rules' : 'Resume all rules'}>
+            <span className="btn-pause-all__dot" />
+            {systemOn ? t('footer_quick_toggle', lang) : t('footer_quick_resume', lang)}
+          </button>
+          <button className="footer-action-btn" title="Copy active redirects as cURL"
+            onClick={() => {
+              const lines = redirects.filter(r => r.enabled).map(r => `# ${r.name}\ncurl -L '${r.from || r.sourceUrl || ''}' '${r.to || r.targetUrl || ''}'`)
+              navigator.clipboard?.writeText(lines.join('\n\n') || '# No active redirects').catch(() => {})
+            }}>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="5" y="2" width="9" height="12" rx="1.5"/><path d="M5 4H3.5A1.5 1.5 0 0 0 2 5.5v8A1.5 1.5 0 0 0 3.5 15H10a1.5 1.5 0 0 0 1.5-1.5V13"/></svg>
+            cURL
+          </button>
+          <button className="footer-action-btn" title="Open chrome://extensions"
+            onClick={() => { chrome?.tabs?.create?.({ url: 'chrome://extensions' }) }}>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="8" cy="8" r="2"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3M3.22 3.22l2.12 2.12M10.66 10.66l2.12 2.12M12.78 3.22l-2.12 2.12M5.34 10.66l-2.12 2.12"/></svg>
+            Manage
+          </button>
+        </div>
       </footer>
     </div>
   )

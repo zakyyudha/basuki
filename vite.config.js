@@ -20,6 +20,7 @@ const STATIC_COPY_TARGETS = [
   { from: 'images', to: 'images' },
   { from: 'styles', to: 'styles' },
   { from: 'assets', to: 'assets' },
+  { from: 'src/popup/assets', to: 'assets' },
 ]
 
 function rewritePopupHtml(rawHtml) {

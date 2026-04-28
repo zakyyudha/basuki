@@ -760,3 +760,46 @@ code, pre { font-family: var(--font-mono); }
 .status-badge--sky    { background: oklch(0.82 0.15 210 / 0.08); color: var(--backlight);      border-color: oklch(0.82 0.15 210 / 0.3); }
 .status-badge--amber  { background: oklch(0.82 0.16 75 / 0.08);  color: oklch(0.82 0.16 75);  border-color: oklch(0.82 0.16 75 / 0.3); }
 .status-badge--rose   { background: oklch(0.68 0.22 22 / 0.08);  color: oklch(0.82 0.17 22);  border-color: oklch(0.68 0.22 22 / 0.3); }
+
+/* ── Footer quick-action buttons ─────────────────────────────────────────── */
+.popup-footer__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.footer-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 6px;
+  border: 1px solid var(--hairline);
+  background: var(--panel);
+  padding: 5px 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: border-color 0.15s, color 0.15s;
+}
+.footer-action-btn:hover {
+  border-color: oklch(0.82 0.15 210 / 0.35);
+  color: var(--backlight);
+}
+/* Make icon button large enough for 32px PNG */
+.popup-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  flex-shrink: 0;
+  transition: border-color 0.15s;
+}
+.popup-icon-btn:hover {
+  border-color: oklch(0.82 0.15 210 / 0.4);
+}
