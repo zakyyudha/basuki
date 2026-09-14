@@ -4,7 +4,10 @@ import { findMatchingRedirectConfig, findMatchingInterceptConfig } from '../util
 import { log } from '../utils/logger.js';
 
 export function applyAxiosPatch() {
+    if (window.__basukiAxiosPatchApplied) return;
+    window.__basukiAxiosPatchApplied = true;
     const ensureString = (value) => (typeof value === 'string' ? value : (value == null ? '' : String(value)));
+    const emitHit = (config, url, status) => window.postMessage({ type: 'BASUKI_HIT', kind: 'intercept', id: config.id, url, status }, '*');
 
     const buildFullUrl = (config) => {
         const rawUrl = ensureString(config?.url);
@@ -63,6 +66,8 @@ export function applyAxiosPatch() {
                     log('Axios intercept — modified response:', body);
                 }
 
+                emitHit(interceptConfig, fullUrl, status);
+
                 config.adapter = async () => ({
                     data: body,
                     status,
@@ -109,4 +114,3 @@ export function applyAxiosPatch() {
         }
     }, 100);
 }
-

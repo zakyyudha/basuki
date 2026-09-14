@@ -23,19 +23,21 @@ function isRemoteVersionNewer(remoteVersion, currentVersion) {
   return false
 }
 
-// Checks for updates on GitHub every 30 minutes
+// Checks for updates at most once per day.
 export async function checkForUpdates () {
   const configs = await getStorageData()
   const now = Date.now()
-  const thirtyMinutes = 1800000
+  const oneDay = 86400000
 
-  if (!configs.lastUpdateCheck || now - configs.lastUpdateCheck > thirtyMinutes) {
+  if (!configs.lastUpdateCheck || now - configs.lastUpdateCheck > oneDay) {
     try {
       const response = await fetch(`${GITHUB_REPO_URL}/releases/latest`)
+      if (!response.ok) throw new Error(`Update check failed: HTTP ${response.status}`)
       const { tag_name: latestVersion } = await response.json()
 
-      if (isRemoteVersionNewer(latestVersion, CURRENT_EXTENSION_VERSION)) notifyUserAboutUpdate()
-      updateStorage({ ...configs, lastUpdateCheck: now })
+      const updateAvailable = isRemoteVersionNewer(latestVersion, CURRENT_EXTENSION_VERSION)
+      updateStorage({ lastUpdateCheck: now, updateAvailable, latestVersion: latestVersion || null })
+      if (updateAvailable) notifyUserAboutUpdate()
     } catch (error) {
       console.error('Failed to fetch updates:', error)
     }

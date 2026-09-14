@@ -2,6 +2,7 @@ import { getDebugSummary, pushDebugLog } from '../adapters/debugAdapter.js'
 import { listInterceptConfigs } from '../adapters/interceptAdapter.js'
 import { listRedirectConfigs } from '../adapters/redirectAdapter.js'
 import { getIsolatedTabs } from '../adapters/sessionAdapter.js'
+import { getSystemEnabled, getUpdateState } from '../adapters/systemAdapter.js'
 
 function normalizeError(error, fallbackCode = 'BOOTSTRAP_ERROR') {
   if (!error) {
@@ -27,11 +28,13 @@ function hydrateSystemState(redirects, intercepts) {
 }
 
 export async function bootstrapSnapshot() {
-  const [redirectResult, interceptResult, sessionResult, debugResult] = await Promise.all([
+  const [redirectResult, interceptResult, sessionResult, debugResult, systemEnabled, updateState] = await Promise.all([
     listRedirectConfigs(),
     listInterceptConfigs(),
     getIsolatedTabs(),
     getDebugSummary(),
+    getSystemEnabled(),
+    getUpdateState(),
   ])
 
   const redirects = redirectResult.data || []
@@ -69,6 +72,8 @@ export async function bootstrapSnapshot() {
       summary,
       logs: summary.logs || [],
       systemState: hydrateSystemState(redirects, intercepts),
+      systemEnabled,
+      ...updateState,
       hydrationMeta: {
         loadedAt: new Date().toISOString(),
         errors,

@@ -32,6 +32,9 @@ export function createPopupStore({ onDebug } = {}) {
     summary: normalizeSummary(null),
     logs: [],
     systemState: 'on',
+    systemEnabled: true,
+    updateAvailable: false,
+    latestVersion: null,
     hydrationMeta: {
       loadedAt: null,
       errors: [],
@@ -85,6 +88,12 @@ export function createPopupStore({ onDebug } = {}) {
     if (payload.systemState) {
       state.systemState = payload.systemState
     }
+
+    if (typeof payload.systemEnabled === 'boolean') {
+      state.systemEnabled = payload.systemEnabled
+    }
+    if (typeof payload.updateAvailable === 'boolean') state.updateAvailable = payload.updateAvailable
+    if (payload.latestVersion) state.latestVersion = payload.latestVersion
 
     if (payload.hydrationMeta) {
       state.hydrationMeta = {

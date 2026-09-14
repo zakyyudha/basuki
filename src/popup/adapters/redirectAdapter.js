@@ -20,6 +20,7 @@ function normalizeToUi(config) {
     enabled: config.enabled ?? true,
     debug: config.debug ?? false,
     hits: config.hits ?? 0,
+    lastHitAt: config.lastHitAt ?? null,
   }
 }
 
@@ -69,6 +70,7 @@ export function createRedirectConfig(payload) {
     enabled: payload?.enabled ?? true,
     debug: payload?.debug ?? false,
     hits: payload?.hits ?? 0,
+    lastHitAt: payload?.lastHitAt ?? null,
   }
 }
 

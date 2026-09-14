@@ -3,10 +3,12 @@ import { storageGet, storageSet } from './chromeClient.js'
 import { listInterceptConfigs, toggleInterceptEnabled } from './interceptAdapter.js'
 import { listRedirectConfigs, toggleRedirectEnabled } from './redirectAdapter.js'
 import { getIsolatedTabs } from './sessionAdapter.js'
+import { validateImportSnapshot } from '../utils/importValidation.js'
 
 const logBuffer = []
 const MAX_LOGS = 250
 const RUNTIME_LOGS_KEY = 'basukiLogs'
+const TRAFFIC_KEY = 'basukiTraffic'
 
 function nowId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -56,6 +58,16 @@ export async function loadRuntimeLogs() {
 export async function clearRuntimeLogs() {
   await storageSet({ [RUNTIME_LOGS_KEY]: [] })
   return []
+}
+
+export async function loadTraffic() {
+  const response = await storageGet(TRAFFIC_KEY)
+  return response.ok && Array.isArray(response.data?.[TRAFFIC_KEY]) ? response.data[TRAFFIC_KEY] : []
+}
+
+export async function clearTraffic() {
+  const result = await storageSet({ [TRAFFIC_KEY]: [] })
+  return result.ok ? { ok: true, data: [], error: null } : result
 }
 
 /**
@@ -184,30 +196,14 @@ export async function exportConfigSnapshot() {
   }
 }
 
-function getImportValidationError(snapshot) {
-  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
-    return 'Import snapshot must be a JSON object'
-  }
-  if (snapshot.redirect && !Array.isArray(snapshot.redirect.configs)) {
-    return 'Import redirect.configs must be an array'
-  }
-  if (snapshot.intercept && !Array.isArray(snapshot.intercept.configs)) {
-    return 'Import intercept.configs must be an array'
-  }
-  if (snapshot.sessionIsolation && (typeof snapshot.sessionIsolation !== 'object' || Array.isArray(snapshot.sessionIsolation))) {
-    return 'Import sessionIsolation must be an object'
-  }
-  return null
-}
-
 export async function importConfigSnapshot(snapshot) {
-  const validationError = getImportValidationError(snapshot)
-  if (validationError) {
-    const logEntry = pushDebugLog('error', 'debug', validationError)
+  const validation = validateImportSnapshot(snapshot)
+  if (!validation.ok) {
+    const logEntry = pushDebugLog('error', 'debug', validation.error)
     return {
       ok: false,
       data: { logEntry },
-      error: { code: 'INVALID_IMPORT', message: validationError },
+      error: { code: 'INVALID_IMPORT', message: validation.error },
     }
   }
 

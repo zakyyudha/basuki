@@ -10,10 +10,13 @@ initSessionIsolationListeners()
 
 console.log('Basuki - version:', CURRENT_EXTENSION_VERSION)
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   console.log('Basuki - Installed')
   handleInstallation()
   checkAndUpdateIconState()
+  checkForUpdates()
+  chrome.alarms.create('basuki-update-check', { periodInMinutes: 1440 })
+  if (details.reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('welcome.html') })
 })
 
 // Also run cleanup on extension startup
@@ -25,6 +28,12 @@ chrome.runtime.onStartup.addListener(() => {
     }
   })
   checkAndUpdateIconState()
+  checkForUpdates()
+  chrome.alarms.create('basuki-update-check', { periodInMinutes: 1440 })
+})
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'basuki-update-check') checkForUpdates()
 })
 
 // Handles initial setup on installation
@@ -49,15 +58,15 @@ function handleInstallation () {
 }
 
 
-chrome.storage.onChanged.addListener(async () => {
+chrome.storage.onChanged.addListener(() => {
   checkAndUpdateIconState()
-  await checkForUpdates()
 })
 
 // Updates the extension icon based on storage data
 function checkAndUpdateIconState () {
   chrome.storage.local.get((storageData) => {
-    const isEnabled = ['apiRedirect', 'apiIntercept'].some(key =>
+    const systemEnabled = storageData.systemEnabled !== false
+    const isEnabled = systemEnabled && ['apiRedirect', 'apiIntercept'].some(key =>
       storageData[key]?.configs?.some(config => config.enabled),
     )
     // Also check if any isolated tabs are active
@@ -78,7 +87,104 @@ function updateExtensionIcon (isEnabled) {
   })
 }
 
+const TRAFFIC_KEY = 'basukiTraffic'
+const MAX_TRAFFIC = 200
+const MAX_CAPTURE_BYTES = 64 * 1024
+function captureHeaders(headers = {}) {
+  return Object.fromEntries(Object.entries(headers).map(([name, value]) => [name, String(value)]))
+}
+
+function captureBody(body) {
+  if (body == null) return null
+  if (typeof body === 'string') return body.slice(0, MAX_CAPTURE_BYTES)
+  if (body instanceof ArrayBuffer) return new TextDecoder().decode(body.slice(0, MAX_CAPTURE_BYTES))
+  if (Array.isArray(body)) return new TextDecoder().decode(new Uint8Array(body).slice(0, MAX_CAPTURE_BYTES))
+  return String(body).slice(0, MAX_CAPTURE_BYTES)
+}
+
+function recordTraffic(entry) {
+  chrome.storage.local.get([TRAFFIC_KEY], (data) => {
+    const current = Array.isArray(data?.[TRAFFIC_KEY]) ? data[TRAFFIC_KEY] : []
+    chrome.storage.local.set({
+      [TRAFFIC_KEY]: [{ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, ...entry }, ...current].slice(0, MAX_TRAFFIC),
+    })
+  })
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'proxyRequest') {
+    let target
+    try {
+      target = new URL(request.url)
+    } catch {
+      sendResponse({ ok: false, error: 'Invalid proxy URL' })
+      return false
+    }
+
+    const isLocalTarget =
+      (target.protocol === 'http:' || target.protocol === 'https:') &&
+      (target.hostname === 'localhost' || target.hostname === '127.0.0.1' || target.hostname === '::1')
+
+    if (!isLocalTarget) {
+      sendResponse({ ok: false, error: 'Proxy target must be localhost' })
+      return false
+    }
+
+    const startedAt = Date.now()
+    fetch(target, {
+      method: request.method || 'GET',
+      headers: request.headers || {},
+      body: request.body,
+    }).then(async (response) => {
+      const body = await response.arrayBuffer()
+      recordTraffic({
+        timestamp: startedAt,
+        sourceUrl: request.sourceUrl || null,
+        method: request.method || 'GET',
+        localUrl: target.toString(),
+        requestHeaders: captureHeaders(request.headers),
+        requestBody: captureBody(request.body),
+        status: response.status,
+        statusText: response.statusText,
+        responseHeaders: captureHeaders(Object.fromEntries(response.headers.entries())),
+        responseBody: captureBody(body),
+        durationMs: Date.now() - startedAt,
+        ok: response.ok,
+      })
+      sendResponse({
+        ok: true,
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: Array.from(new Uint8Array(body)),
+      })
+    }).catch((error) => {
+      recordTraffic({
+        timestamp: startedAt,
+        sourceUrl: request.sourceUrl || null,
+        method: request.method || 'GET',
+        localUrl: target.toString(),
+        requestHeaders: captureHeaders(request.headers),
+        requestBody: captureBody(request.body),
+        status: null,
+        statusText: '',
+        responseHeaders: {},
+        responseBody: null,
+        durationMs: Date.now() - startedAt,
+        ok: false,
+        error: error.message,
+      })
+      sendResponse({ ok: false, error: error.message })
+    })
+    return true
+  }
+
+  if (request.action === 'openInspector') {
+    chrome.windows.create({ url: chrome.runtime.getURL('inspector.html'), type: 'popup', width: 1100, height: 760 })
+    sendResponse({ success: true })
+    return false
+  }
+
   if (request.action === 'getIsolatedTabs') {
     Promise.resolve(getIsolatedTabsForPopup())
       .then((isolatedTabs) => {

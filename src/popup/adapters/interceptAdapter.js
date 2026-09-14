@@ -22,6 +22,8 @@ function normalizeToUi(config = {}) {
     body: config.body ?? config.interceptResponseBody ?? '',
     enabled: config.enabled ?? true,
     debug: config.debug ?? false,
+    hits: config.hits ?? 0,
+    lastHitAt: config.lastHitAt ?? null,
   }
 }
 
@@ -69,6 +71,8 @@ export function createInterceptConfig(payload = {}) {
     interceptResponseBody: payload?.body ?? payload?.interceptResponseBody ?? '',
     enabled: payload?.enabled ?? true,
     debug: payload?.debug ?? false,
+    hits: payload?.hits ?? 0,
+    lastHitAt: payload?.lastHitAt ?? null,
   }
 }
 

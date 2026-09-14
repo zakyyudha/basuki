@@ -32,6 +32,19 @@ function injectScript (src, config) {
 window.addEventListener('message', (event) => {
   if (event.source !== window) return
 
+  if (event.data?.type === 'BASUKI_PROXY_REQUEST') {
+    const { requestId, ...request } = event.data
+    chrome.runtime.sendMessage({ action: 'proxyRequest', ...request }, (response) => {
+      const error = chrome.runtime.lastError
+      window.postMessage({
+        type: 'BASUKI_PROXY_RESPONSE',
+        requestId,
+        response: error ? { ok: false, error: error.message } : response,
+      }, '*')
+    })
+    return
+  }
+
   // ── BASUKI_HIT: increment hits on a matching redirect/intercept config ──
   if (event.data?.type === 'BASUKI_HIT') {
     const { kind, id } = event.data
@@ -43,7 +56,7 @@ window.addEventListener('message', (event) => {
       const configs = data[storageKey].configs.map((c) =>
         // id may be stored as number or string — compare loosely
         // eslint-disable-next-line eqeqeq
-        c.id == id ? { ...c, hits: (c.hits || 0) + 1 } : c
+        c.id == id ? { ...c, hits: (c.hits || 0) + 1, lastHitAt: Date.now() } : c
       )
       chrome.storage.local.set({ [storageKey]: { ...data[storageKey], configs } })
     })
@@ -71,33 +84,39 @@ window.addEventListener('message', (event) => {
   }
 })
 
-// ── Boot: read storage, check enabled configs, inject intercept ───────────────
+let injected = false
+
+function syncConfig(data) {
+  const apiRedirectEnabled = data.apiRedirect?.configs?.some(config => config.enabled)
+  const apiInterceptEnabled = data.apiIntercept?.configs?.some(config => config.enabled)
+  const anyEnabled = apiRedirectEnabled || apiInterceptEnabled
+
+  if (!anyEnabled && !injected) return
+  if (!injected) {
+    injected = true
+    injectScript('intercept.js', data)
+  } else {
+    window.postMessage({ type: 'BASUKI_CONFIG', config: data }, '*')
+  }
+}
+
+// ── Boot and live sync: read storage, inject intercept, update matcher ────────
 chrome.storage.local.get((data) => {
   // Enhanced debugging
   console.log('Basuki - Storage received:', data)
   console.log('Basuki - Has apiRedirect?', !!data?.apiRedirect)
   console.log('Basuki - Has apiIntercept?', !!data?.apiIntercept)
 
-  // Check if data exists and has at least one configuration type
   if (!data || (!data.apiRedirect && !data.apiIntercept)) {
     console.log('Basuki - No configuration found, skipping injection.')
     console.log('Basuki - Debug: data object is:', JSON.stringify(data))
     return
   }
 
-  const apiRedirectEnabled = data.apiRedirect?.configs?.some(config => config.enabled)
-  const apiInterceptEnabled = data.apiIntercept?.configs?.some(config => config.enabled)
-  const anyEnabled = apiRedirectEnabled || apiInterceptEnabled
-
-  console.log('Basuki - apiRedirect enabled configs?', apiRedirectEnabled)
-  console.log('Basuki - apiIntercept enabled configs?', apiInterceptEnabled)
   console.log('Basuki - Settings Loaded:', data)
+  syncConfig(data)
+})
 
-  if (!anyEnabled) {
-    console.log('Basuki - Disabled because no configs are enabled.')
-    return
-  }
-
-  console.log('Basuki - ✅ Injecting content script.')
-  injectScript('intercept.js', data)
+chrome.storage.onChanged.addListener(() => {
+  chrome.storage.local.get(syncConfig)
 })

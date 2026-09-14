@@ -16,10 +16,17 @@ import {
   clearDebugLogs,
   listAllLogs,
   clearRuntimeLogs,
+  loadTraffic,
+  clearTraffic,
   exportConfigSnapshot,
   importConfigSnapshot,
   buildCopySummary,
 } from '../adapters/debugAdapter.js'
+import { setSystemEnabled } from '../adapters/systemAdapter.js'
+import { listDrafts, removeDraft } from '../adapters/draftAdapter.js'
+import { listSessionPresets, removeSessionPreset, saveSessionPreset } from '../adapters/sessionPresetAdapter.js'
+import { validateSessionOrigin } from '../utils/validation.js'
+import { validateImportSnapshot } from '../utils/importValidation.js'
 import {
   activateIsolatedTab,
   createIsolatedTab,
@@ -35,64 +42,43 @@ const TABS = [
   { key: 'session', tKey: 'tab_session' },
   { key: 'debug', tKey: 'tab_debug' },
 ]
-const SYSTEM_ON_STORAGE_KEY = 'basuki:popup:systemOn'
-const PAUSED_RULES_STORAGE_KEY = 'basuki:popup:pausedRules'
 const MANIFEST_VERSION = chrome.runtime.getManifest().version
 
-function getStoredSystemOn() {
-  try {
-    const stored = localStorage.getItem(SYSTEM_ON_STORAGE_KEY)
-    return stored === null ? true : stored !== 'false'
-  } catch (error) {
-    console.warn('[popup] Failed to read system state preference', error)
-    return true
-  }
+function relativeTime(timestamp, lang) {
+  const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000))
+  if (seconds < 60) return t('time_seconds', lang, { value: seconds })
+  const minutes = Math.round(seconds / 60)
+  return t('time_minutes', lang, { value: minutes })
 }
 
-function setStoredSystemOn(value) {
-  try {
-    localStorage.setItem(SYSTEM_ON_STORAGE_KEY, value ? 'true' : 'false')
-  } catch (error) {
-    console.warn('[popup] Failed to store system state preference', error)
-  }
+function Toast({ message }) {
+  if (!message) return null
+  return <div className="popup-toast" role="status" aria-live="polite">{message}</div>
 }
 
-function getStoredPausedRules() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PAUSED_RULES_STORAGE_KEY) || '{}')
-    return {
-      redirects: Array.isArray(parsed.redirects) ? parsed.redirects : [],
-      intercepts: Array.isArray(parsed.intercepts) ? parsed.intercepts : [],
-    }
-  } catch (error) {
-    console.warn('[popup] Failed to read paused rules snapshot', error)
-    return { redirects: [], intercepts: [] }
-  }
+function errorText(error) {
+  return error?.message || error?.error || 'Operation failed. Try again.'
 }
 
-function setStoredPausedRules(snapshot) {
-  try {
-    localStorage.setItem(PAUSED_RULES_STORAGE_KEY, JSON.stringify({
-      redirects: Array.isArray(snapshot.redirects) ? snapshot.redirects : [],
-      intercepts: Array.isArray(snapshot.intercepts) ? snapshot.intercepts : [],
-    }))
-  } catch (error) {
-    console.warn('[popup] Failed to store paused rules snapshot', error)
-  }
+function isStaleNoMatch(rule) {
+  const timestamp = rule.createdAt || rule.updatedAt || 0
+  return timestamp > 0 && Date.now() - timestamp > 300000
 }
 
-function clearStoredPausedRules() {
-  try {
-    localStorage.removeItem(PAUSED_RULES_STORAGE_KEY)
-  } catch (error) {
-    console.warn('[popup] Failed to clear paused rules snapshot', error)
-  }
+function mergeSessions(runtimeSessions, presets) {
+  const runtime = Array.isArray(runtimeSessions) ? runtimeSessions : []
+  const savedPresets = Array.isArray(presets) ? presets : []
+  const runtimeIds = new Set(runtime.map(session => String(session.isolationId || session.id)))
+  return [
+    ...runtime,
+    ...savedPresets.filter(preset => !runtimeIds.has(String(preset.id))),
+  ]
 }
 
 /* ── Toggle ───────────────────────────────────────────────────────────────── */
-function Toggle({ checked, onChange, label }) {
+function Toggle({ checked, onChange, label, disabled = false }) {
   return (
-    <button type="button" role="switch" aria-checked={checked} aria-label={label}
+    <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled}
       onClick={e => { e.stopPropagation(); onChange(!checked) }}
       className={`toggle${checked ? ' on' : ''}`}>
       <span className="toggle__dot" />
@@ -108,20 +94,12 @@ function BasukiIcon({ state }) {
       ? './assets/icon_intercepted.png'
       : './assets/icon_enabled.png'
   return (
-    <img src={src} alt={`Basuki ${state}`}
+    <img src={src} alt=""
       style={{ width: 32, height: 32, objectFit: 'contain', imageRendering: 'crisp-edges' }} />
   )
 }
 
 /* ── Method badge ─────────────────────────────────────────────────────────── */
-const METHOD_COLORS = {
-  GET:    'bg-sky-10    text-sky    border-sky',
-  POST:   'bg-green-10  text-green  border-green',
-  PUT:    'bg-amber-10  text-amber  border-amber',
-  PATCH:  'bg-violet-10 text-violet border-violet',
-  DELETE: 'bg-rose-10   text-rose   border-rose',
-  ALL:    'bg-zinc-10   text-zinc   border-zinc',
-}
 function MethodBadge({ method }) {
   return <span className={`method-badge method-badge--${(method||'GET').toLowerCase()}`}>{method||'GET'}</span>
 }
@@ -129,7 +107,7 @@ function MethodBadge({ method }) {
 /* ── Status badge ─────────────────────────────────────────────────────────── */
 function StatusBadge({ status }) {
   const n = Number(status)
-  const cls = n >= 500 ? 'rose' : n >= 400 ? 'amber' : n >= 300 ? 'sky' : 'green'
+  const cls = !Number.isFinite(n) ? 'rose' : n >= 500 ? 'rose' : n >= 400 ? 'amber' : n >= 300 ? 'sky' : 'green'
   return <span className={`status-badge status-badge--${cls}`}>{status}</span>
 }
 
@@ -138,13 +116,13 @@ function KvRow({ k, v, accent }) {
   return (
     <div className="kv-row">
       <span className="kv-row__key">{k}</span>
-      <code className={`kv-row__val${accent ? ' accent' : ''}`}>{v}</code>
+      <code title={v} className={`kv-row__val${accent ? ' accent' : ''}`}>{v}</code>
     </div>
   )
 }
 
 /* ── Panel shell — no duplicate add button ────────────────────────────────── */
-function PanelShell({ label, counter, onAdd, addLabel, isEmpty, children }) {
+function PanelShell({ label, description, counter, onAdd, addLabel, isEmpty, children }) {
   return (
     <div className="panel-shell">
       <div className="panel-shell__head">
@@ -153,8 +131,11 @@ function PanelShell({ label, counter, onAdd, addLabel, isEmpty, children }) {
       </div>
       <div className="panel-shell__body">
         {isEmpty
-          ? <button className="empty-state" onClick={onAdd}>{addLabel}</button>
-          : <>
+          ? <>
+              {description && <p className="empty-state__description">{description}</p>}
+              <button className="empty-state" onClick={onAdd}>{addLabel}</button>
+            </>
+           : <>
               {children}
               <button className="btn-add-rule" onClick={onAdd}>{addLabel}</button>
             </>
@@ -165,46 +146,49 @@ function PanelShell({ label, counter, onAdd, addLabel, isEmpty, children }) {
 }
 
 /* ── Redirect panel ───────────────────────────────────────────────────────── */
-function RedirectsPanel({ lang, rules, onToggle, onAdd, onEdit, onDelete }) {
-  const [pending, setPending] = useState(null)
+function RedirectsPanel({ lang, systemOn, pending, rules, onToggle, onAdd, onEdit, onDelete }) {
+  const [deletePending, setDeletePending] = useState(null)
   const active = rules.filter(r => r.enabled).length
   return (
     <PanelShell label={t('panel_redirects', lang)}
-      counter={`${String(active).padStart(2,'0')}/${String(rules.length).padStart(2,'0')}`}
+      description={rules.length === 0 ? t('empty_redirects', lang) : undefined}
+      counter={`${active}/${rules.length}`}
       onAdd={onAdd} addLabel={t('add_rule', lang)} isEmpty={rules.length === 0}>
       {rules.map(r => (
-        <article key={r.id} className="rule-card">
+        <article key={r.id} className={`rule-card${!systemOn && r.enabled ? ' system-paused' : ''}`}>
           <div className="rule-card__head">
             <div>
               <div className="rule-card__name">{r.name}</div>
-              <div className="rule-card__hits">{t('stat_hits_label', lang)} · <span>{(r.hits || 0).toLocaleString()}</span></div>
+             <div className="rule-card__hits" title={r.lastHitAt ? new Date(r.lastHitAt).toLocaleString() : undefined}>{t('stat_hits_label', lang)} · <span>{(r.hits || 0).toLocaleString()}</span>{r.lastHitAt && ` · ${relativeTime(r.lastHitAt, lang)}`}</div>
             </div>
-            <Toggle checked={!!r.enabled} onChange={v => onToggle(r.id, v)} label={`Toggle ${r.name}`} />
+             <Toggle checked={!!r.enabled} disabled={pending} onChange={v => onToggle(r.id, v)} label={`Toggle ${r.name}`} />
           </div>
-          <KvRow k="FROM" v={r.from || ''} />
-          <KvRow k="TO" v={r.to || ''} accent={!!r.enabled} />
+           <KvRow k="FROM" v={r.from || ''} />
+           <KvRow k="TO" v={r.to || ''} accent={!!r.enabled && systemOn} />
+           {systemOn && r.enabled && !r.hits && isStaleNoMatch(r) && <p className="rule-card__hint">{t('no_matches_yet', lang)}</p>}
           <div className="rule-card__actions">
             <button className="btn-edit" onClick={() => onEdit(r.id)}>{t('edit', lang)}</button>
-            <button className="btn-delete" onClick={() => setPending(r.id)}>{t('delete', lang)}</button>
+             <button className="btn-delete" onClick={() => setDeletePending(r.id)}>{t('delete', lang)}</button>
           </div>
         </article>
       ))}
-      <ConfirmDialog lang={lang} open={!!pending}
-        onCancel={() => setPending(null)}
-        onConfirm={() => { if (pending) onDelete(pending); setPending(null) }} />
+       <ConfirmDialog lang={lang} open={!!deletePending}
+         onCancel={() => setDeletePending(null)}
+         onConfirm={() => { if (deletePending) onDelete(deletePending); setDeletePending(null) }} />
     </PanelShell>
   )
 }
 
 /* ── Intercept panel — accordion matching rework ──────────────────────────── */
-function InterceptsPanel({ lang, rules, onToggle, onAdd, onEdit, onDelete }) {
-  const [expanded, setExpanded] = useState(rules[0]?.id ?? null)
-  const [pending, setPending] = useState(null)
+function InterceptsPanel({ lang, systemOn, pending, rules, onToggle, onAdd, onEdit, onDelete }) {
+  const [expanded, setExpanded] = useState(null)
+  const [deletePending, setDeletePending] = useState(null)
   const active = rules.filter(r => r.enabled).length
 
   return (
     <PanelShell label={t('panel_intercepts', lang)}
-      counter={`${String(active).padStart(2,'0')}/${String(rules.length).padStart(2,'0')}`}
+      description={rules.length === 0 ? t('empty_intercepts', lang) : undefined}
+      counter={`${active}/${rules.length}`}
       onAdd={onAdd} addLabel={t('add_mock', lang)} isEmpty={rules.length === 0}>
       {rules.map(r => {
         const open = expanded === r.id
@@ -213,46 +197,47 @@ function InterceptsPanel({ lang, rules, onToggle, onAdd, onEdit, onDelete }) {
         const status = r.status || r.responseStatus || 200
         const body = r.body || r.responseBody || ''
         return (
-          <article key={r.id} className="rule-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <article key={r.id} className={`rule-card accordion-card${!systemOn && r.enabled ? ' system-paused' : ''}`}>
             {/* Collapsed header — always visible, click to expand */}
-            <button type="button"
-              onClick={() => setExpanded(open ? null : r.id)}
-              style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', padding: '12px', textAlign: 'left', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                <MethodBadge method={method} />
-                <code style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {pattern}
-                </code>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                <StatusBadge status={status} />
-                <Toggle checked={!!r.enabled} onChange={v => onToggle(r.id, v)} label={`Toggle ${r.name}`} />
-              </div>
-            </button>
+             <div className="accordion-row">
+             <button type="button" className="accordion-row__expand"
+               onClick={() => setExpanded(open ? null : r.id)}
+               aria-expanded={open}>
+               <div className="accordion-row__pattern">
+                 <MethodBadge method={method} />
+                 <code title={pattern}>{pattern}</code>
+               </div>
+             </button>
+             <div className="accordion-row__meta">
+                 <StatusBadge status={status} />
+                  <Toggle checked={!!r.enabled} disabled={pending} onChange={v => onToggle(r.id, v)} label={`Toggle ${r.name}`} />
+               </div>
+             </div>
             {/* Expanded body */}
             {open && (
-              <div style={{ borderTop: '1px solid var(--hairline)', padding: '12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <KvRow k="NAME" v={r.name || ''} />
+              <div className="accordion-body">
+                 <KvRow k="NAME" v={r.name || ''} />
+                 <div className="rule-card__hits">{t('stat_hits_label', lang)} · <span>{(r.hits || 0).toLocaleString()}</span>{r.lastHitAt && ` · ${relativeTime(r.lastHitAt, lang)}`}</div>
                 <div>
-                  <p style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>
+                   <p className="accordion-body__label">
                     {t('field_body', lang)}
                   </p>
-                  <pre style={{ fontFamily: 'var(--font-mono)', fontSize: 10, lineHeight: 1.6, color: 'oklch(0.78 0.01 270)', borderRadius: 6, border: '1px solid var(--hairline)', background: 'oklch(0.13 0.008 280 / 60%)', padding: '8px', maxHeight: 96, overflowY: 'auto' }}>
-                    {body || '// empty'}
+                   <pre className="accordion-body__preview">
+                     {body || t('empty_body', lang)}
                   </pre>
                 </div>
-                <div className="rule-card__actions" style={{ marginTop: 0, paddingTop: 8 }}>
+                 <div className="rule-card__actions accordion-body__actions">
                   <button className="btn-edit" onClick={() => onEdit(r.id)}>{t('edit', lang)}</button>
-                  <button className="btn-delete" onClick={() => setPending(r.id)}>{t('delete', lang)}</button>
+                   <button className="btn-delete" onClick={() => setDeletePending(r.id)}>{t('delete', lang)}</button>
                 </div>
               </div>
             )}
           </article>
         )
       })}
-      <ConfirmDialog lang={lang} open={!!pending}
-        onCancel={() => setPending(null)}
-        onConfirm={() => { if (pending) onDelete(pending); setPending(null) }} />
+       <ConfirmDialog lang={lang} open={!!deletePending}
+         onCancel={() => setDeletePending(null)}
+         onConfirm={() => { if (deletePending) onDelete(deletePending); setDeletePending(null) }} />
     </PanelShell>
   )
 }
@@ -263,7 +248,8 @@ function SessionsPanel({ lang, sessions, onLaunch, onClose, onAdd, onEdit, onDel
   const active = sessions.filter(s => s.active).length
   return (
     <PanelShell label={t('panel_sessions', lang)}
-      counter={`${String(active).padStart(2,'0')}/${String(sessions.length).padStart(2,'0')}`}
+      description={sessions.length === 0 ? t('empty_sessions', lang) : undefined}
+      counter={`${active}/${sessions.length}`}
       onAdd={onAdd} addLabel={t('add_session', lang)} isEmpty={sessions.length === 0}>
       {sessions.map(s => (
         <article key={s.id} className="rule-card"
@@ -271,11 +257,11 @@ function SessionsPanel({ lang, sessions, onLaunch, onClose, onAdd, onEdit, onDel
           <div className="rule-card__head">
             <div>
               <div className="rule-card__name">{s.name}</div>
-              <code style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{s.origin}</code>
+             <code title={s.origin} style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{s.origin}</code>
             </div>
             <span style={{ fontSize: 9, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', textTransform: 'uppercase', color: s.active ? 'var(--backlight)' : 'oklch(0.4 0.01 270)' }}>
               <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '9999px', background: s.active ? 'var(--backlight)' : 'oklch(0.3 0.01 270)', marginRight: 4, verticalAlign: 'middle' }} />
-              {s.active ? t('status_active', lang) : 'Idle'}
+               {s.active ? t('status_active', lang) : t('status_idle', lang)}
             </span>
           </div>
           <div className="rule-card__actions">
@@ -305,13 +291,13 @@ function SumRow({ k, v, accent, full }) {
   )
 }
 
-function DebugPanel({ lang, systemState, redirects, intercepts, sessions, logs, onClearLogs, onExportConfig, onImportConfig, onCopySummary, importInputRef, onImportFile }) {
+function DebugPanel({ lang, systemState, redirects, intercepts, sessions, logs, traffic, onClearTraffic, onOpenInspector, onClearLogs, onExportConfig, onImportConfig, onCopySummary, importInputRef, onImportFile }) {
   const totals = {
     redirects: redirects.length, intercepts: intercepts.length, sessions: sessions.length,
     activeRedirects: redirects.filter(r => r.enabled).length,
     activeIntercepts: intercepts.filter(r => r.enabled).length,
     activeSessions: sessions.filter(s => s.active).length,
-    hits: redirects.reduce((s, r) => s + (r.hits || 0), 0),
+     hits: [...redirects, ...intercepts].reduce((s, r) => s + (r.hits || 0), 0),
   }
   return (
     <div className="panel-shell">
@@ -321,15 +307,15 @@ function DebugPanel({ lang, systemState, redirects, intercepts, sessions, logs, 
       </div>
       <div className="panel-shell__body">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <button className="debug-action-btn" onClick={onExportConfig}>↓ {t('debug_export', lang)}</button>
-          <button className="debug-action-btn" onClick={onImportConfig}>↑ {t('debug_import', lang)}</button>
-          <button className="debug-action-btn" onClick={onCopySummary} style={{ gridColumn: 'span 2' }}>⧉ {t('debug_copy_summary', lang)}</button>
+           <button className="debug-action-btn" onClick={onExportConfig}>{t('debug_export', lang)}</button>
+           <button className="debug-action-btn" onClick={onImportConfig}>{t('debug_import', lang)}</button>
+           <button className="debug-action-btn" onClick={onCopySummary} style={{ gridColumn: 'span 2' }}>{t('debug_copy_summary', lang)}</button>
           <input ref={importInputRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={onImportFile} />
         </div>
         <section className="rule-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <span className="panel-shell__label">{t('debug_summary', lang)}</span>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.1em', textTransform: 'uppercase', color: systemState === 'off' ? 'oklch(0.4 0.01 270)' : systemState === 'intercepting' ? 'var(--warn)' : 'var(--backlight)' }}>{systemState}</span>
+             <span className="debug-system-state">{t(`system_${systemState}`, lang)}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             <SumRow k={t('debug_total_redirects', lang)}   v={totals.redirects} />
@@ -358,6 +344,11 @@ function DebugPanel({ lang, systemState, redirects, intercepts, sessions, logs, 
             }
           </div>
         </section>
+         <section className="rule-card debug-traffic-summary">
+           <span className="panel-shell__label">{t('debug_traffic', lang)}</span>
+           <strong>{traffic.length} {t('debug_relayed', lang)} · {traffic.filter(entry => !entry.ok).length} {t('debug_failed', lang)}</strong>
+           <button className="debug-action-btn" onClick={onOpenInspector}>{t('debug_open_inspector', lang)}</button>
+         </section>
       </div>
     </div>
   )
@@ -367,18 +358,31 @@ function DebugPanel({ lang, systemState, redirects, intercepts, sessions, logs, 
 export function AppShell({ state, onLanguageChange, onRefresh }) {
   const [lang, setLang] = useState(getStoredLanguage())
   const [tab, setTab] = useState('redirect')
-  const [systemOn, setSystemOn] = useState(getStoredSystemOn)
+  const [systemOn, setSystemOn] = useState(() => state?.systemEnabled !== false)
   // Redirect/intercept state is seeded from store snapshot, then updated locally after CRUD
   const [redirects, setRedirects] = useState(() => state?.redirects || [])
   const [intercepts, setIntercepts] = useState(() => state?.intercepts || [])
   const [sessions, setSessions] = useState(() => state?.sessions || [])
+  const [sessionPresets, setSessionPresets] = useState([])
+  const [draftRecovery, setDraftRecovery] = useState([])
   const [logs, setLogs] = useState(() => state?.logs || [])
+  const [traffic, setTraffic] = useState([])
   const [editor, setEditor] = useState(null)
+  const [toast, setToast] = useState('')
+  const [pending, setPending] = useState(false)
+  const toastTimerRef = useRef(null)
   const [loading, setLoading] = useState(!state?.redirects)
 
   // ── Sync from store when it delivers live updates (storage.onChanged) ────
   const prevStateRef = useRef(state)
   const importInputRef = useRef(null)
+  useEffect(() => {
+    Promise.all([listSessionPresets(), listDrafts()]).then(([presets, drafts]) => {
+      setSessionPresets(presets)
+      setSessions(current => mergeSessions(current, presets))
+      setDraftRecovery(Object.values(drafts).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)))
+    }).catch(() => {})
+  }, [])
   useEffect(() => {
     if (state && state !== prevStateRef.current) {
       prevStateRef.current = state
@@ -387,11 +391,18 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
         if (Array.isArray(state.redirects)) setRedirects(state.redirects)
         if (Array.isArray(state.intercepts)) setIntercepts(state.intercepts)
       }
-      if (Array.isArray(state.sessions)) setSessions(state.sessions)
+      if (Array.isArray(state.sessions)) setSessions(mergeSessions(state.sessions, sessionPresets))
       if (Array.isArray(state.logs)) setLogs(state.logs)
+      if (typeof state.systemEnabled === 'boolean') setSystemOn(state.systemEnabled)
       setLoading(false)
     }
-  }, [state, editor])
+  }, [state, editor, sessionPresets])
+
+  const showToast = useCallback((message) => {
+    setToast(message)
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = window.setTimeout(() => setToast(''), 2600)
+  }, [])
 
   // ── Fallback boot: direct fetch if store snapshot was empty ─────────────
   useEffect(() => {
@@ -399,32 +410,61 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
       Promise.all([listRedirectConfigs(), listInterceptConfigs(), getIsolatedTabs()]).then(([r, i, s]) => {
         if (r.ok) setRedirects(r.data || [])
         if (i.ok) setIntercepts(i.data || [])
-        if (s.ok) setSessions(s.data?.isolatedTabs || [])
+        if (s.ok) setSessions(mergeSessions(s.data?.isolatedTabs || [], sessionPresets))
         setLogs(listDebugLogs())
         setLoading(false)
       }).catch(() => setLoading(false))
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionPresets])
 
   const activeRules = redirects.filter(r => r.enabled).length + intercepts.filter(r => r.enabled).length
   const activeSessions = sessions.filter(s => s.active).length
-  const totalHits = redirects.reduce((sum, r) => sum + (r.hits || 0), 0)
+  const totalHits = [...redirects, ...intercepts].reduce((sum, r) => sum + (r.hits || 0), 0)
   const systemState = !systemOn ? 'off' : activeRules > 0 ? 'intercepting' : 'on'
+  const tabCounts = { redirect: activeRules === 0 ? 0 : redirects.filter(r => r.enabled).length, intercept: intercepts.filter(r => r.enabled).length, session: activeSessions, debug: logs.length }
 
   const handleLang = useCallback((key) => {
     setLang(key); setStoredLanguage(key); onLanguageChange?.(key)
   }, [onLanguageChange])
 
-  const updateSystemOn = useCallback((value) => {
+  const updateSystemOn = useCallback(async (value) => {
+    if (pending) return false
+    setPending(true)
+    const result = await setSystemEnabled(value)
+    setPending(false)
+    if (!result.ok) {
+      showToast(errorText(result.error))
+      return false
+    }
     setSystemOn(value)
-    setStoredSystemOn(value)
-  }, [])
+    showToast(t(value ? 'toast_resumed' : 'toast_paused', lang))
+    return true
+  }, [lang, pending, showToast])
 
   // Refresh logs from in-memory buffer + storage runtime logs after any CRUD op or tab switch
   const refreshLogs = useCallback(async () => {
-    const merged = await listAllLogs()
+    const [merged, localTraffic] = await Promise.all([listAllLogs(), loadTraffic()])
     setLogs(merged)
+    setTraffic(localTraffic)
   }, [])
+
+  const handleClearTraffic = useCallback(async () => {
+    const result = await clearTraffic()
+    if (!result?.ok) {
+      showToast(errorText(result.error))
+      return
+    }
+    setTraffic([])
+  }, [showToast])
+
+  const handleOpenInspector = useCallback(() => {
+    chrome.runtime.sendMessage({ action: 'openInspector' }, () => {
+      if (chrome.runtime.lastError) {
+        pushDebugLog('error', 'debug', 'Failed opening traffic inspector', chrome.runtime.lastError.message)
+        showToast(chrome.runtime.lastError.message)
+      }
+    })
+  }, [showToast])
 
   // When switching to debug tab, immediately pull fresh verbose logs from storage
   const handleTabChange = useCallback((key) => {
@@ -437,6 +477,7 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
     const result = await exportConfigSnapshot()
     if (!result.ok) {
       pushDebugLog('error', 'debug', 'Failed exporting config snapshot', result.error)
+      showToast(errorText(result.error))
       await refreshLogs()
       return
     }
@@ -449,13 +490,15 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
     link.click()
     URL.revokeObjectURL(url)
     pushDebugLog('info', 'debug', 'Exported config snapshot')
+    showToast(t('toast_exported', lang))
     await refreshLogs()
-  }, [refreshLogs])
+  }, [lang, refreshLogs, showToast])
 
   const handleCopySummary = useCallback(async () => {
     const result = await buildCopySummary()
     if (!result.ok) {
       pushDebugLog('error', 'debug', 'Failed copying debug summary', result.error)
+      showToast(errorText(result.error))
       await refreshLogs()
       return
     }
@@ -463,11 +506,13 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
     try {
       await navigator.clipboard.writeText(result.data)
       pushDebugLog('info', 'debug', 'Copied debug summary to clipboard')
+      showToast(t('toast_copied', lang))
     } catch (error) {
       pushDebugLog('error', 'debug', 'Clipboard write failed for debug summary', error)
+      showToast(errorText(error))
     }
     await refreshLogs()
-  }, [refreshLogs])
+  }, [lang, refreshLogs, showToast])
 
   const handleImportConfig = useCallback(() => {
     importInputRef.current?.click()
@@ -479,158 +524,138 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
 
     try {
       const parsed = JSON.parse(await file.text())
+      const validation = validateImportSnapshot(parsed)
+      if (!validation.ok) {
+        showToast(validation.error)
+        return
+      }
+  const { redirects, intercepts, sessions } = validation.counts
+      const confirmed = window.confirm(t('confirm_import', lang)
+        .replace('{redirects}', redirects)
+        .replace('{intercepts}', intercepts)
+        .replace('{sessions}', sessions))
+      if (!confirmed) return
+      setPending(true)
       const result = await importConfigSnapshot(parsed)
       if (result.ok) {
+        showToast(t('toast_imported', lang))
         onRefresh?.(['redirect', 'intercept', 'session', 'debug'])
-      }
+      } else showToast(errorText(result.error))
+      setPending(false)
     } catch (error) {
       pushDebugLog('error', 'debug', 'Invalid JSON import file', error)
+      showToast(t('toast_import_failed', lang))
     } finally {
+      setPending(false)
       event.target.value = ''
       await refreshLogs()
     }
-  }, [onRefresh, refreshLogs])
+  }, [lang, onRefresh, refreshLogs, showToast])
 
   // ── Redirect CRUD (persisted) ─────────────────────────────────────────────
-  const addRedirect = async () => {
-    // Draft starts disabled — user must explicitly enable after configuring
-    const draft = { id: Date.now(), name: 'New Redirect', from: 'https://example.com/*', to: 'http://localhost:3000', enabled: false, hits: 0 }
-    const res = await addRedirectConfig(draft)
-    if (res.ok) setRedirects(res.data)
+  const addRedirect = () => {
+    const draft = { id: Date.now(), name: '', from: '', to: 'http://localhost:3000', enabled: false, hits: 0 }
+    setRedirects(prev => [...prev, draft])
     setEditor({ kind: 'redirect', id: draft.id, isNew: true })
-    pushDebugLog('info', 'redirect', `Created draft redirect: ${draft.name}`)
-    refreshLogs()
   }
   const saveRedirect = async (next) => {
-    const res = await updateRedirectConfig(next.id, next)
-    if (res.ok) setRedirects(res.data)
+    if (pending) return
+    setPending(true)
+    const res = editor?.isNew ? await addRedirectConfig(next) : await updateRedirectConfig(next.id, next)
+    setPending(false)
+    if (!res.ok) { showToast(errorText(res.error)); return }
+    setRedirects(res.data)
+    await removeDraft('redirect', next.id)
     setEditor(null)
     pushDebugLog('info', 'redirect', `Saved redirect: ${next.name} (${next.from} → ${next.to})`)
+    showToast(t('toast_saved', lang))
     refreshLogs()
     onRefresh?.(['redirect'])
   }
   const deleteRedirect = async (id) => {
+    if (pending) return
+    setPending(true)
     const res = await deleteRedirectConfig(id)
-    if (res.ok) setRedirects(res.data)
+    setPending(false)
+    if (!res.ok) { showToast(errorText(res.error)); return }
+    setRedirects(res.data)
+    await removeDraft('redirect', id)
     // Only close editor if it was editing the specific deleted rule
     if (editor?.id === id) setEditor(null)
     pushDebugLog('warn', 'redirect', `Deleted redirect id=${id}`)
+    showToast(t('toast_deleted', lang))
     refreshLogs()
     onRefresh?.(['redirect'])
   }
   const toggleRedirect = async (id, enabled) => {
+    if (pending) return
+    setPending(true)
     const res = await toggleRedirectEnabled(id, enabled)
-    if (res.ok) setRedirects(res.data)
+    setPending(false)
+    if (!res.ok) { showToast(errorText(res.error)); return }
+    setRedirects(res.data)
     pushDebugLog('info', 'redirect', `Toggled redirect id=${id} → ${enabled ? 'enabled' : 'disabled'}`)
     refreshLogs()
     onRefresh?.(['redirect'])
   }
 
   // ── Intercept CRUD (persisted) ────────────────────────────────────────────
-  const addIntercept = async () => {
-    // Draft starts disabled — user must explicitly enable after configuring
-    const draft = { id: Date.now(), name: 'New Mock', method: 'GET', pattern: '/api/example', status: 200, body: '{}', enabled: false }
-    const res = await addInterceptConfig(draft)
-    if (res.ok) setIntercepts(res.data)
+  const addIntercept = () => {
+    const draft = { id: Date.now(), name: '', method: 'GET', pattern: '', status: 200, body: '{}', enabled: false }
+    setIntercepts(prev => [...prev, draft])
     setEditor({ kind: 'intercept', id: draft.id, isNew: true })
-    pushDebugLog('info', 'intercept', `Created draft intercept: ${draft.name}`)
-    refreshLogs()
   }
   const saveIntercept = async (next) => {
-    const res = await updateInterceptConfig(next.id, next)
-    if (res.ok) setIntercepts(res.data)
+    if (pending) return
+    setPending(true)
+    const res = editor?.isNew ? await addInterceptConfig(next) : await updateInterceptConfig(next.id, next)
+    setPending(false)
+    if (!res.ok) { showToast(errorText(res.error)); return }
+    setIntercepts(res.data)
+    await removeDraft('intercept', next.id)
     setEditor(null)
     pushDebugLog('info', 'intercept', `Saved intercept: ${next.name}`)
+    showToast(t('toast_saved', lang))
     refreshLogs()
     onRefresh?.(['intercept'])
   }
   const deleteIntercept = async (id) => {
+    if (pending) return
+    setPending(true)
     const res = await deleteInterceptConfig(id)
-    if (res.ok) setIntercepts(res.data)
+    setPending(false)
+    if (!res.ok) { showToast(errorText(res.error)); return }
+    setIntercepts(res.data)
+    await removeDraft('intercept', id)
     if (editor?.kind === 'intercept' && editor?.id === id) setEditor(null)
     pushDebugLog('warn', 'intercept', `Deleted intercept id=${id}`)
+    showToast(t('toast_deleted', lang))
     refreshLogs()
     onRefresh?.(['intercept'])
   }
   const toggleIntercept = async (id, enabled) => {
+    if (pending) return
+    setPending(true)
     const res = await toggleInterceptEnabled(id, enabled)
-    if (res.ok) setIntercepts(res.data)
+    setPending(false)
+    if (!res.ok) { showToast(errorText(res.error)); return }
+    setIntercepts(res.data)
     pushDebugLog('info', 'intercept', `Toggled intercept id=${id} → ${enabled ? 'enabled' : 'disabled'}`)
     refreshLogs()
     onRefresh?.(['intercept'])
   }
 
-  const pauseAllRules = async () => {
-    const activeRedirects = redirects.filter(r => r.enabled)
-    const activeIntercepts = intercepts.filter(r => r.enabled)
-    setStoredPausedRules({
-      redirects: activeRedirects.map(r => r.id),
-      intercepts: activeIntercepts.map(r => r.id),
-    })
-    if (activeRedirects.length === 0 && activeIntercepts.length === 0) {
-      updateSystemOn(false)
-      return
-    }
-
-    let latestRedirects = redirects
-    let latestIntercepts = intercepts
-
-    for (const r of activeRedirects) {
-      const res = await toggleRedirectEnabled(r.id, false)
-      if (res.ok) latestRedirects = res.data
-    }
-    for (const i of activeIntercepts) {
-      const res = await toggleInterceptEnabled(i.id, false)
-      if (res.ok) latestIntercepts = res.data
-    }
-
-    setRedirects(latestRedirects)
-    setIntercepts(latestIntercepts)
-    updateSystemOn(false)
-    pushDebugLog('warn', 'system', `Pause All applied (${activeRedirects.length} redirects, ${activeIntercepts.length} intercepts disabled)`)
-    refreshLogs()
-    onRefresh?.(['redirect', 'intercept'])
-  }
-
-  const resumeRules = async () => {
-    const pausedRules = getStoredPausedRules()
-    let latestRedirects = redirects
-    let latestIntercepts = intercepts
-    let restoredRedirects = 0
-    let restoredIntercepts = 0
-
-    for (const id of pausedRules.redirects) {
-      const res = await toggleRedirectEnabled(id, true)
-      if (res.ok) {
-        latestRedirects = res.data
-        restoredRedirects += 1
-      }
-    }
-    for (const id of pausedRules.intercepts) {
-      const res = await toggleInterceptEnabled(id, true)
-      if (res.ok) {
-        latestIntercepts = res.data
-        restoredIntercepts += 1
-      }
-    }
-
-    setRedirects(latestRedirects)
-    setIntercepts(latestIntercepts)
-    clearStoredPausedRules()
-    updateSystemOn(true)
-    pushDebugLog('info', 'system', `Resume All restored ${restoredRedirects} redirects and ${restoredIntercepts} intercepts`)
-    refreshLogs()
-    onRefresh?.(['redirect', 'intercept'])
-  }
+  const pauseAllRules = () => updateSystemOn(false)
+  const resumeRules = () => updateSystemOn(true)
 
   // ── Session CRUD (runtime-managed) ─────────────────────────────────────────
   const refreshSessions = useCallback(async () => {
     const refreshed = await getIsolatedTabs()
     if (refreshed.ok) {
-      setSessions(refreshed.data?.isolatedTabs || [])
+      setSessions(mergeSessions(refreshed.data?.isolatedTabs || [], sessionPresets))
     }
     return refreshed
-  }, [])
+  }, [sessionPresets])
 
   const addSession = () => {
     const draft = {
@@ -648,42 +673,72 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
     setEditor({ kind: 'session', id: draft.id, isNew: true })
   }
   const saveSession = async (next) => {
+    if (pending) return
     if (next.isolationId) {
-      await renameIsolatedTab(next.isolationId || next.id, next.name)
+      setPending(true)
+      const result = await renameIsolatedTab(next.isolationId || next.id, next.name)
+      setPending(false)
+      if (!result.ok) { showToast(errorText(result.error)); return }
       pushDebugLog('info', 'session', `Renamed isolated session: ${next.name}`)
       await refreshSessions()
       await refreshLogs()
       onRefresh?.(['session', 'debug'])
     } else {
-      // Backend only persists runtime isolation metadata; draft-only fields stay local until launch.
-      setSessions(prev => prev.map(s => s.id === next.id ? next : s))
+      setPending(true)
+      const result = await saveSessionPreset({ ...next, isDraft: false })
+      setPending(false)
+      if (!result.ok) { showToast(errorText(result.error)); return }
+      const saved = { ...next, isDraft: false, isPreset: true }
+      setSessionPresets(prev => [...prev.filter(item => item.id !== saved.id), saved])
+      setSessions(prev => prev.map(s => s.id === next.id ? saved : s))
     }
+    await removeDraft('session', next.id)
+    showToast(t('toast_saved', lang))
     setEditor(null)
   }
   const deleteSession = async (id) => {
+    if (pending) return
     const session = sessions.find(s => s.id === id)
     if (session?.isolationId) {
-      await removeIsolatedTab(session.isolationId || id)
+      setPending(true)
+      const result = await removeIsolatedTab(session.isolationId || id)
+      setPending(false)
+      if (!result.ok) { showToast(errorText(result.error)); return }
       pushDebugLog('warn', 'session', `Deleted isolated session: ${session.name}`)
       await refreshSessions()
       await refreshLogs()
       onRefresh?.(['session', 'debug'])
     } else {
+      setPending(true)
+      const result = await removeSessionPreset(id)
+      setPending(false)
+      if (!result.ok) { showToast(errorText(result.error)); return }
+      setSessionPresets(prev => prev.filter(item => item.id !== id))
       setSessions(prev => prev.filter(s => s.id !== id))
     }
+    await removeDraft('session', id)
+    showToast(t('toast_deleted', lang))
     if (editor?.kind === 'session' && editor?.id === id) setEditor(null)
   }
   const launchSession = async (id) => {
+    if (pending) return
     const session = sessions.find(s => s.id === id)
     if (!session) return
 
     if (session.isolationId) {
-      await activateIsolatedTab(session.isolationId)
+      setPending(true)
+      const result = await activateIsolatedTab(session.isolationId)
+      setPending(false)
+      if (!result.ok) { showToast(errorText(result.error)); return }
       pushDebugLog('info', 'session', `Activated isolated session: ${session.name}`)
     } else {
-      await createIsolatedTab(session.url || session.origin)
-      pushDebugLog('info', 'session', `Created isolated session from ${session.url || session.origin}`)
-      if (session.isDraft) setEditor(null)
+      const origin = validateSessionOrigin(session.origin || session.url)
+      if (!origin.ok) { showToast(t('err_origin', lang)); return }
+      setPending(true)
+      const result = await createIsolatedTab(origin.value)
+      setPending(false)
+      if (!result.ok) { showToast(errorText(result.error)); return }
+      pushDebugLog('info', 'session', `Created isolated session from ${origin.value}`)
     }
 
     await refreshSessions()
@@ -694,7 +749,11 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
     const session = sessions.find(s => s.id === id)
     if (!session?.isolationId) return
 
-    await removeIsolatedTab(session.isolationId)
+    if (pending) return
+    setPending(true)
+    const result = await removeIsolatedTab(session.isolationId)
+    setPending(false)
+    if (!result.ok) { showToast(errorText(result.error)); return }
     pushDebugLog('warn', 'session', `Closed isolated session: ${session.name}`)
     await refreshSessions()
     await refreshLogs()
@@ -705,9 +764,27 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
   const editingIntercept = editor?.kind === 'intercept' ? intercepts.find(r => r.id === editor.id) : undefined
   const editingSession = editor?.kind === 'session' ? sessions.find(s => s.id === editor.id) : undefined
 
+  const resumeDraft = (draft) => {
+    if (draft.kind === 'redirect') setRedirects(prev => prev.some(item => item.id === draft.id) ? prev.map(item => item.id === draft.id ? draft.values : item) : [...prev, draft.values])
+    if (draft.kind === 'intercept') setIntercepts(prev => prev.some(item => item.id === draft.id) ? prev.map(item => item.id === draft.id ? draft.values : item) : [...prev, draft.values])
+    if (draft.kind === 'session') setSessions(prev => prev.some(item => item.id === draft.id) ? prev.map(item => item.id === draft.id ? draft.values : item) : [...prev, draft.values])
+    setEditor({ kind: draft.kind, id: draft.id, isNew: draft.isNew })
+    setDraftRecovery(prev => prev.filter(item => !(item.kind === draft.kind && item.id === draft.id)))
+  }
+
+  const discardDraft = async (draft) => {
+    await removeDraft(draft.kind, draft.id)
+    setDraftRecovery(prev => prev.filter(item => !(item.kind === draft.kind && item.id === draft.id)))
+    if (draft.isNew) {
+      if (draft.kind === 'redirect') setRedirects(prev => prev.filter(item => item.id !== draft.id))
+      if (draft.kind === 'intercept') setIntercepts(prev => prev.filter(item => item.id !== draft.id))
+      if (draft.kind === 'session') setSessions(prev => prev.filter(item => item.id !== draft.id))
+    }
+  }
+
   return (
     <div className="popup-root">
-      <header className="popup-header">
+       <header className="popup-header">
         <div className="popup-header__left">
           <button className="popup-icon-btn" onClick={() => updateSystemOn(!systemOn)} aria-label={t('toggle_system', lang)}>
             <BasukiIcon state={systemState} />
@@ -716,7 +793,8 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
             <div className="popup-brand__name">BASUKI<span>v{MANIFEST_VERSION}</span></div>
             <div className="popup-brand__status">
               {systemState === 'off' ? t('status_paused', lang) : systemState === 'intercepting' ? t('status_intercepting', lang) : t('status_active', lang)}
-            </div>
+         </div>
+         {state?.updateAvailable && <a className="update-chip" href="https://github.com/zakyyudha/basuki/releases/latest" target="_blank" rel="noreferrer">{t('update_available', lang)}{state.latestVersion ? ` · ${state.latestVersion}` : ''}</a>}
           </div>
         </div>
         <div className="lang-switch">
@@ -728,23 +806,44 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
 
       <nav className="popup-tabs" role="tablist">
         {TABS.map(tb => (
-          <button key={tb.key} role="tab" aria-selected={tab === tb.key}
-            className={`popup-tabs__btn${tab === tb.key ? ' active' : ''}`}
-            onClick={() => handleTabChange(tb.key)}>
-            {t(tb.tKey, lang)}
+             <button key={tb.key} id={`tab-${tb.key}`} role="tab" tabIndex={tab === tb.key ? 0 : -1} aria-controls={`panel-${tb.key}`} aria-selected={tab === tb.key}
+             className={`popup-tabs__btn${tab === tb.key ? ' active' : ''}`}
+             onClick={() => handleTabChange(tb.key)}
+             onKeyDown={event => {
+               if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+               event.preventDefault()
+               const index = TABS.findIndex(item => item.key === tb.key)
+               const next = TABS[(index + (event.key === 'ArrowRight' ? 1 : -1) + TABS.length) % TABS.length]
+               handleTabChange(next.key)
+               document.getElementById(`tab-${next.key}`)?.focus()
+             }}>
+             {t(tb.tKey, lang)}{tb.key !== 'debug' && <span className="tab-count">{tabCounts[tb.key]}</span>}
           </button>
         ))}
       </nav>
 
-      <div className="popup-body" role="tabpanel">
-        {!loading && tab === 'redirect' && (
-          <RedirectsPanel lang={lang} rules={redirects}
+      <div className="popup-body" id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
+        {draftRecovery.length > 0 && !editor && (
+          <section className="draft-recovery" role="status">
+            <strong>{t('draft_recovery_title', lang)}</strong>
+            {draftRecovery.map(draft => (
+              <div className="draft-recovery__item" key={`${draft.kind}:${draft.id}`}>
+                <span>{t(`tab_${draft.kind}`, lang)} · {new Date(draft.updatedAt).toLocaleTimeString()}</span>
+                <button className="btn-edit" onClick={() => resumeDraft(draft)}>{t('resume', lang)}</button>
+                <button className="btn-delete" onClick={() => discardDraft(draft)}>{t('discard', lang)}</button>
+              </div>
+            ))}
+          </section>
+        )}
+       {!loading && tab === 'redirect' && (
+          <RedirectsPanel lang={lang} systemOn={systemOn} pending={pending} rules={redirects}
             onToggle={toggleRedirect} onAdd={addRedirect}
             onEdit={id => setEditor({ kind: 'redirect', id, isNew: false })}
             onDelete={deleteRedirect} />
         )}
+        {loading && <><div className="skeleton-card" /><div className="skeleton-card" /><div className="skeleton-card" /></>}
         {!loading && tab === 'intercept' && (
-          <InterceptsPanel lang={lang} rules={intercepts}
+          <InterceptsPanel lang={lang} systemOn={systemOn} pending={pending} rules={intercepts}
             onToggle={toggleIntercept} onAdd={addIntercept}
             onEdit={id => setEditor({ kind: 'intercept', id, isNew: false })}
             onDelete={deleteIntercept} />
@@ -759,7 +858,7 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
         {tab === 'debug' && (
           <DebugPanel lang={lang} systemState={systemState}
             redirects={redirects} intercepts={intercepts} sessions={sessions}
-            logs={logs}
+            logs={logs} traffic={traffic} onClearTraffic={handleClearTraffic} onOpenInspector={handleOpenInspector}
             onClearLogs={async () => {
               clearDebugLogs()
               await clearRuntimeLogs()
@@ -779,31 +878,32 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
           <RedirectEditor lang={lang} rule={editingRedirect} isNew={editor.isNew}
             onSave={saveRedirect}
             onDelete={() => deleteRedirect(editingRedirect.id)}
-            onClose={() => editor.isNew ? deleteRedirect(editingRedirect.id) : setEditor(null)} />
+             onClose={() => { removeDraft('redirect', editingRedirect.id); if (editor.isNew) setRedirects(prev => prev.filter(r => r.id !== editingRedirect.id)); setEditor(null) }} />
         )}
         {editingIntercept && editor?.kind === 'intercept' && (
           <InterceptEditor lang={lang} rule={editingIntercept} isNew={editor.isNew}
             onSave={saveIntercept}
             onDelete={() => deleteIntercept(editingIntercept.id)}
-            onClose={() => editor.isNew ? deleteIntercept(editingIntercept.id) : setEditor(null)} />
+             onClose={() => { removeDraft('intercept', editingIntercept.id); if (editor.isNew) setIntercepts(prev => prev.filter(r => r.id !== editingIntercept.id)); setEditor(null) }} />
         )}
         {editingSession && editor?.kind === 'session' && (
           <SessionEditor lang={lang} session={editingSession} isNew={editor.isNew}
             onSave={saveSession}
             onDelete={() => deleteSession(editingSession.id)}
-            onClose={() => editor.isNew ? deleteSession(editingSession.id) : setEditor(null)} />
+             onClose={() => { removeDraft('session', editingSession.id); if (editor.isNew) setSessions(prev => prev.filter(s => s.id !== editingSession.id)); setEditor(null) }} />
         )}
-      </div>
+       </div>
+       <Toast message={toast} />
 
       <footer className="popup-footer">
         <div className="popup-footer__stats">
           <div className="popup-stat">
             <span className="popup-stat__label">{t('stat_rules', lang)}</span>
-            <span className="popup-stat__value">{String(activeRules).padStart(2, '0')}</span>
+             <span className="popup-stat__value">{activeRules}/{redirects.length + intercepts.length}</span>
           </div>
           <div className="popup-stat">
             <span className="popup-stat__label">{t('stat_sessions', lang)}</span>
-            <span className="popup-stat__value">{String(activeSessions).padStart(2, '0')}</span>
+             <span className="popup-stat__value">{activeSessions}/{sessions.length}</span>
           </div>
           <div className="popup-stat">
             <span className="popup-stat__label">{t('stat_hits', lang)}</span>
@@ -811,7 +911,7 @@ export function AppShell({ state, onLanguageChange, onRefresh }) {
           </div>
         </div>
         <div className="popup-footer__actions">
-          <button className={`btn-pause-all${systemOn ? '' : ' resume'}`} onClick={() => { if (systemOn) pauseAllRules(); else resumeRules() }} title={systemOn ? 'Pause all active rules' : 'Resume all rules'}>
+           <button className={`btn-pause-all${systemOn ? '' : ' resume'}`} onClick={() => { if (systemOn) pauseAllRules(); else resumeRules() }} title={systemOn ? t('pause_all_title', lang) : t('resume_all_title', lang)}>
             <span className="btn-pause-all__dot" />
             {systemOn ? t('footer_quick_toggle', lang) : t('footer_quick_resume', lang)}
           </button>

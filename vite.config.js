@@ -14,6 +14,7 @@ const INPUT_ENTRIES = {
   intercept: path.resolve(__dirname, 'src/content/intercept.js'),
   isolation: path.resolve(__dirname, 'src/content/isolation.js'),
   popup: path.resolve(__dirname, 'src/popup/app/main.jsx'),
+  inspector: path.resolve(__dirname, 'src/popup/app/inspector.jsx'),
 }
 
 const STATIC_COPY_TARGETS = [
@@ -88,9 +89,16 @@ function mv3CopyPlugin() {
       const popupTargetPath = path.join(distDir, 'popup.html')
       const manifestSourcePath = path.resolve(__dirname, 'manifest.json')
       const manifestTargetPath = path.join(distDir, 'manifest.json')
+      const inspectorSourcePath = path.resolve(__dirname, 'inspector.html')
+      const inspectorTargetPath = path.join(distDir, 'inspector.html')
+      const welcomeSourcePath = path.resolve(__dirname, 'welcome.html')
+      const welcomeTargetPath = path.join(distDir, 'welcome.html')
 
       const popupHtml = fs.readFileSync(popupSourcePath, 'utf8')
       fs.writeFileSync(popupTargetPath, rewritePopupHtml(popupHtml), 'utf8')
+      const inspectorHtml = fs.readFileSync(inspectorSourcePath, 'utf8')
+      fs.writeFileSync(inspectorTargetPath, inspectorHtml, 'utf8')
+      fs.copyFileSync(welcomeSourcePath, welcomeTargetPath)
 
       const manifestRaw = fs.readFileSync(manifestSourcePath, 'utf8')
       fs.writeFileSync(manifestTargetPath, rewriteManifest(manifestRaw), 'utf8')
